@@ -1,0 +1,43 @@
+# Entorno virtual
+venv/
+.env
+
+# Cachés de Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Archivos de log
+*.log
+
+# Archivos de configuración específicos de IDEs
+.vscode/
+.idea/
+
+# Metadata de tests
+.tox/
+.coverage
+*.cover
+*.py,cover
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Archivos de dump/depuración
+*.sqlite3
+*.db
+*.dump
+
+# Otros específicos
+.DS_Store
+Thumbs.db
+
+# Binarios de compilación
+*.so
+*.dll
+*.dylib
+*.exe
+
+# Exclusión explícita de binance_api.log
+binance_api.log

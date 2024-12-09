@@ -298,12 +298,24 @@ class TradeManager:
             # Calcular el precio de stop loss
             stop_loss_price = average_buy_price * (1 - (self.stop_loss_margin / 100))
 
+            # Calcular porcentaje de ganancia o pérdida
+            percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100
+            percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
+
             logging.info(f"Asset: {symbol}")
+            logging.info(f"Precio Actual: ${current_price:,.6f}")
             logging.info(f"Posiciones abiertas: {real_balance:,.2f}")
             logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.6f}")
             logging.info(f"Precio Objetivo de Venta: ${target_price:,.6f}")
             logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.6f}")
-            logging.info(f"Precio Actual: ${current_price:,.6f}")
+            
+            # Determinar y registrar solo el porcentaje relevante
+            if current_price > average_buy_price:
+                logging.info(f"Porcentaje de Ganancia: {percentage_gain:.2f}%")
+            elif current_price < average_buy_price:
+                logging.info(f"Porcentaje de Pérdida: {percentage_loss:.2f}%")
+            else:
+                logging.info("Sin ganancia ni pérdida.")
 
             # Verificar si se alcanza el stop loss
             if current_price <= stop_loss_price:

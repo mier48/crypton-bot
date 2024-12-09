@@ -106,7 +106,7 @@ class TelegramNotifier:
                 return (
                     f"🚨 *STOP LOSS ACTIVADO* 🚨\n"
                     f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
                     f"🔹 *Precio de venta:* ${price:,.6f}\n"
                     f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
                     f"🔹 *Pérdida:* {percentage_gain:.2f}%\n"
@@ -117,7 +117,7 @@ class TelegramNotifier:
                 return (
                     f"🎯 *OBJETIVO DE GANANCIA ALCANZADO* 🎯\n"
                     f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
                     f"🔹 *Precio de venta:* ${price:,.6f}\n"
                     f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
                     f"🔹 *Ganancia:* {percentage_gain:.2f}%\n"
@@ -128,7 +128,7 @@ class TelegramNotifier:
                 return (
                     f"🔴 *VENTA EJECUTADA*\n"
                     f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
                     f"🔹 *Precio de venta:* ${price:,.6f}\n"
                     f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
                     f"🔹 *Beneficios:* {percentage_gain:.2f}%\n"

@@ -21,6 +21,7 @@ class TradeExecutor:
         symbol: str, 
         order_type: str, 
         positions: float, 
+        reason: Optional[str] = None,
         price: Optional[float] = None, 
         percentage_gain: Optional[float] = None
     ) -> Optional[bool]:
@@ -31,8 +32,9 @@ class TradeExecutor:
         :param symbol: Símbolo de la criptomoneda (e.g., "BTCUSDT").
         :param order_type: Tipo de orden (e.g., "LIMIT", "MARKET").
         :param positions: Cantidad a operar.
+        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
         :param price: Precio de la operación (opcional, relevante para órdenes LIMIT).
-        :param percentage_gain: Porcentaje de ganancia para notificar en ventas (opcional).
+        :param percentage_gain: Porcentaje de ganancia o pérdida para notificar en ventas (opcional).
         :return: True si la operación fue exitosa, False si hubo un error, None si no se ejecutó.
         """
         try:
@@ -67,7 +69,7 @@ class TradeExecutor:
                 return None
 
             # Procesar y registrar la orden
-            return self._process_order(order, side, symbol, percentage_gain)
+            return self._process_order(order, side, symbol, percentage_gain, reason)
         
         except Exception as e:
             logger.exception(f"Error al ejecutar la orden: {e}")
@@ -78,14 +80,22 @@ class TradeExecutor:
         quantity = round(positions, decimals)
         return int(quantity) if decimals == 0 else quantity
 
-    def _process_order(self, order: Order, side: str, symbol: str, percentage_gain: Optional[float]) -> bool:
+    def _process_order(
+        self, 
+        order: Order, 
+        side: str, 
+        symbol: str, 
+        percentage_gain: Optional[float], 
+        reason: Optional[str] = None  # Nuevo parámetro
+    ) -> bool:
         """
         Procesa la orden ejecutada y envía las notificaciones correspondientes.
 
         :param order: Datos de la orden ejecutada.
         :param side: Dirección de la operación ("BUY" o "SELL").
         :param symbol: Símbolo de la criptomoneda.
-        :param percentage_gain: Porcentaje de ganancia (relevante para ventas).
+        :param percentage_gain: Porcentaje de ganancia o pérdida (relevante para ventas).
+        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
         :return: True si la operación fue procesada correctamente.
         """
         executed_price = float(order["fills"][0]["price"])
@@ -99,7 +109,13 @@ class TradeExecutor:
         initial_balance = self._get_balance(balances, "USDT")
 
         self.notifier.notify_trade(
-            side, symbol, executed_quantity, executed_price, initial_balance, percentage_gain
+            side, 
+            symbol, 
+            executed_quantity, 
+            executed_price, 
+            initial_balance, 
+            percentage_gain,
+            reason
         )
         return True
 

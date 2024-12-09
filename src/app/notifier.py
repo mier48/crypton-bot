@@ -46,6 +46,7 @@ class TelegramNotifier:
         price: float,
         initial_balance: float,
         percentage_gain: Optional[float] = None,
+        reason: Optional[str] = None,
     ) -> bool:
         """
         Envía una notificación específica de compra o venta.
@@ -55,12 +56,13 @@ class TelegramNotifier:
         :param quantity: Cantidad operada.
         :param price: Precio de la operación.
         :param initial_balance: Balance disponible tras la operación.
-        :param percentage_gain: Porcentaje de ganancia en caso de venta.
+        :param percentage_gain: Porcentaje de ganancia o pérdida en caso de venta (opcional).
+        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
         :return: True si se envió correctamente, False de lo contrario.
         """
         try:
             message = self._build_trade_message(
-                side, symbol, quantity, price, initial_balance, percentage_gain
+                side, symbol, quantity, price, initial_balance, percentage_gain, reason
             )
             return self.send_message(message)
         except ValueError as e:
@@ -75,6 +77,7 @@ class TelegramNotifier:
         price: float,
         initial_balance: float,
         percentage_gain: Optional[float] = None,
+        reason: Optional[str] = None,
     ) -> str:
         """
         Construye el mensaje de notificación para operaciones de compra o venta.
@@ -84,7 +87,8 @@ class TelegramNotifier:
         :param quantity: Cantidad operada.
         :param price: Precio de la operación.
         :param initial_balance: Balance disponible tras la operación.
-        :param percentage_gain: Porcentaje de ganancia en caso de venta.
+        :param percentage_gain: Porcentaje de ganancia o pérdida en caso de venta.
+        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
         :return: Mensaje formateado.
         """
         if side.upper() == "BUY":
@@ -98,15 +102,38 @@ class TelegramNotifier:
                 f"\n📈 ¡Esperamos que suba pronto! 🚀"
             )
         elif side.upper() == "SELL":
-            return (
-                f"🔴 *VENTA EJECUTADA*\n"
-                f"🔹 *Activo:* {symbol}\n"
-                f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
-                f"🔹 *Precio de venta:* ${price:.6f}\n"
-                f"🔹 *Total vendido:* ${quantity * price:.2f}\n"
-                f"🔹 *Beneficios:* {percentage_gain:.2f}%\n"
-                f"💵 *Balance actual:* ${initial_balance:.2f}\n"
-                f"\n💰 ¡Ganancia asegurada! 🎉"
-            )
+            if reason == "STOP_LOSS":
+                return (
+                    f"🚨 *STOP LOSS ACTIVADO* 🚨\n"
+                    f"🔹 *Activo:* {symbol}\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
+                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
+                    f"🔹 *Pérdida:* {percentage_gain:.2f}%\n"
+                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
+                    f"\n⚠️ Se ha limitado la pérdida según la estrategia de stop loss."
+                )
+            elif reason == "PROFIT_TARGET":
+                return (
+                    f"🎯 *OBJETIVO DE GANANCIA ALCANZADO* 🎯\n"
+                    f"🔹 *Activo:* {symbol}\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
+                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
+                    f"🔹 *Ganancia:* {percentage_gain:.2f}%\n"
+                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
+                    f"\n💰 ¡Ganancia asegurada! 🎉"
+                )
+            else:
+                return (
+                    f"🔴 *VENTA EJECUTADA*\n"
+                    f"🔹 *Activo:* {symbol}\n"
+                    f"🔹 *Cantidad vendida:* {quantity:.6f} unidades\n"
+                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
+                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
+                    f"🔹 *Beneficios:* {percentage_gain:.2f}%\n"
+                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
+                    f"\n💰 ¡Operación ejecutada! 🎉"
+                )
         else:
             raise ValueError(f"Dirección inválida para la operación: {side}")

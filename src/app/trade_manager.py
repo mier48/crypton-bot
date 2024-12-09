@@ -13,7 +13,7 @@ from app.notifier import TelegramNotifier
 from app.trade_executor import TradeExecutor
 from utils.logger import setup_logger
 
-from config.default import DEFAULT_PROFIT_MARGIN, DEFAULT_SLEEP_INTERVAL, DEFAULT_INVESTMENT_AMOUNT, DEFAULT_MAX_BUY_PRICE
+from config.default import DEFAULT_PROFIT_MARGIN, DEFAULT_SLEEP_INTERVAL, DEFAULT_INVESTMENT_AMOUNT, DEFAULT_MAX_BUY_PRICE, DEFAULT_STOP_LOSS_MARGIN
 
 logging = setup_logger()
 
@@ -35,6 +35,7 @@ class TradeManager:
         self,
         max_records: int = 500,
         profit_margin: float = DEFAULT_PROFIT_MARGIN,
+        stop_loss_margin: float = DEFAULT_STOP_LOSS_MARGIN,
         sleep_interval: int = DEFAULT_SLEEP_INTERVAL
     ):
         """
@@ -53,6 +54,7 @@ class TradeManager:
         self.executor = TradeExecutor()
         self.max_records = max_records
         self.profit_margin = profit_margin
+        self.stop_loss_margin = stop_loss_margin
         self.sleep_interval = sleep_interval
         self.running = False
 
@@ -76,7 +78,7 @@ class TradeManager:
 
         :param symbol: Símbolo de la criptomoneda (e.g., "BTCUSDT").
         :param start_time: Tiempo de inicio en milisegundos.
-        :param end_time: Tiempo de fin en milisegundos.
+        :param end_time: Tiempo de fin en milisegundos.0.12
         :param interval: Intervalo de tiempo para los datos.
         :return: Lista de datos históricos.
         """
@@ -293,21 +295,49 @@ class TradeManager:
             )
             current_price = self.data_manager.get_price(symbol)
 
+            # Calcular el precio de stop loss
+            stop_loss_price = average_buy_price * (1 - (self.stop_loss_margin / 100))
+
             logging.info(f"Asset: {symbol}")
-            logging.info(f"Saldo Real: {real_balance:,.2f}")
+            logging.info(f"Posiciones abiertas: {real_balance:,.2f}")
             logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.6f}")
             logging.info(f"Precio Objetivo de Venta: ${target_price:,.6f}")
+            logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.6f}")
             logging.info(f"Precio Actual: ${current_price:,.6f}")
-            logging.info(f"USDT disponible: ${initial_balance:,.6f}")
 
+            # Verificar si se alcanza el stop loss
+            if current_price <= stop_loss_price:
+                percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
+                logging.info(f"Stop Loss alcanzado. Vender para limitar pérdidas a {percentage_loss:,.2f}%.\n")
+                try:
+                    self.executor.execute_trade(
+                        side="SELL",
+                        symbol=symbol,
+                        order_type="MARKET",
+                        positions=real_balance,
+                        reason="STOP_LOSS",
+                        percentage_gain=-percentage_loss  # Nota: porcentaje negativo para pérdida
+                    )
+                except Exception as e:
+                    logging.error(f"Error al ejecutar la venta por stop loss para {symbol}: {e}")
+                continue  # Salta al siguiente activo después de ejecutar el stop loss
+
+            # Verificar si se alcanza el objetivo de ganancia
             if current_price < target_price:
                 percentage_to_target = ((target_price - current_price) / current_price) * 100
                 logging.info(f"No vender, aún debe subir un {percentage_to_target:,.2f}%\n")
             else:
                 percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100
-                logging.info(f"Vender, puedes vender un {percentage_gain:,.2f}%\n")
+                logging.info(f"Vender, puedes ganar un {percentage_gain:,.2f}%\n")
                 try:
-                    self.executor.execute_trade(side="SELL", symbol=symbol, order_type="MARKET", positions=real_balance, percentage_gain=percentage_gain)
+                    self.executor.execute_trade(
+                        side="SELL", 
+                        symbol=symbol, 
+                        order_type="MARKET", 
+                        positions=real_balance,
+                        reason="PROFIT_TARGET",
+                        percentage_gain=percentage_gain
+                    )
                 except Exception as e:
                     logging.error(f"Error al ejecutar la venta para {symbol}: {e}")
 

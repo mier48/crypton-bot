@@ -1,6 +1,6 @@
 # Crypton Bot
 
-[![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-blue.svg)](./README.md)
+[![Version: 2.0.0-beta](https://img.shields.io/badge/Version-2.0.0--beta-blue.svg)](./README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 **Crypton Bot** es un bot de trading automatizado diseñado para operar activos de alto volumen y bajo costo en exchanges de criptomonedas. Combina eficiencia y simplicidad para maximizar tus operaciones.

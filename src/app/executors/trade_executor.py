@@ -66,10 +66,10 @@ class TradeExecutor:
             )
             if not order:
                 logger.error("La orden no se pudo ejecutar.")
-                return None
-
-            # Procesar y registrar la orden
-            return self._process_order(order, side, symbol, percentage_gain, reason)
+                return False
+            else:
+                # Procesar y registrar la orden
+                return self._process_order(order, side, symbol, percentage_gain, reason)
         
         except Exception as e:
             logger.exception(f"Error al ejecutar la orden: {e}")
@@ -78,7 +78,7 @@ class TradeExecutor:
     def _format_quantity(self, positions: float, decimals: int) -> float:
         """Formatea la cantidad de posiciones según los decimales permitidos."""
         quantity = round(positions, decimals)
-        return int(quantity) if decimals == 0 else quantity
+        return float(f"{quantity:.1f}") if decimals == 0 else quantity
 
     def _process_order(
         self, 

@@ -115,7 +115,7 @@ class BinanceAccountClient(BaseClient):
             # logger.info(f"Orden creada exitosamente: {response}")
             return response
         else:
-            logger.error("Error al crear la orden.")
+            logger.error(f"Error al crear la orden. Endpoint: {endpoint} | Params: {params} | Response: {response}")
             return None
 
     def get_trade_fees(self, symbol: Optional[str] = None) -> Optional[Dict[str, Any]]:

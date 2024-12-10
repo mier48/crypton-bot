@@ -1,8 +1,12 @@
 # src/api/binance/data_manager.py
 
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from api.binance.clients.account_client import BinanceAccountClient
 from api.binance.clients.market_client import BinanceMarketClient
+from utils.date_utils import interval_to_milliseconds
 from utils.logger import setup_logger
 
 logger = setup_logger()
@@ -81,6 +85,12 @@ class BinanceDataManager:
         Obtiene las principales criptomonedas ordenadas por precio o volumen.
         """
         return self.market_client.get_top_cryptocurrencies(top_n, by)
+    
+    def get_popular_by_price_range(self, min_price: float, max_price: float, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Obtiene las criptomonedas más populares entre un rango de precios.
+        """
+        return self.market_client.get_popular_by_price_range(min_price, max_price, limit)
 
     ## Operaciones de Cuenta y Trading
     def get_balance_summary(self) -> List[Dict[str, Any]]:
@@ -145,3 +155,56 @@ class BinanceDataManager:
         Obtiene los datos de un símbolo específico.
         """
         return self.market_client.get("api/v3/exchangeInfo", params={"symbol": symbol})
+    
+    def get_market_volatility(
+        self,
+        symbol: str = "BTCUSDT",
+        interval: str = "1h",
+        lookback: int = 24
+    ) -> Optional[float]:
+        """
+        Calcula la volatilidad del mercado para un símbolo específico basado en los datos de velas.
+
+        :param symbol: Par de trading, por ejemplo, 'BTCUSDT'.
+        :param interval: Intervalo de tiempo de las velas, por ejemplo, '1h' para una hora.
+        :param lookback: Número de velas a considerar para el cálculo.
+        :return: Volatilidad calculada como la desviación estándar de los rendimientos logarítmicos.
+        """
+        try:
+            # Calcular el tiempo actual y el tiempo de inicio
+            end_time_dt = datetime.now(timezone.utc)
+            interval_ms = interval_to_milliseconds(interval)
+            start_time_dt = end_time_dt - timedelta(milliseconds=interval_ms * lookback)
+
+            # Convertir datetime a timestamp en milisegundos
+            end_time = int(end_time_dt.timestamp() * 1000)
+            start_time = int(start_time_dt.timestamp() * 1000)
+
+            # Obtener datos de velas de Binance
+            klines = self.fetch_historical_data(symbol=symbol, interval=interval, start_time=start_time, end_time=end_time)
+            if not klines:
+                logger.error("No se pudieron obtener datos de velas de Binance.")
+                return None
+
+            # Crear un DataFrame con los precios de cierre
+            df = pd.DataFrame(klines, columns=[
+                'open_time', 'open', 'high', 'low', 'close', 'volume',
+                'close_time', 'quote_asset_volume', 'number_of_trades',
+                'taker_buy_base_asset_volume', 'taker_buy_quote_asset_volume', 'ignore'
+            ])
+            df['close'] = df['close'].astype(float)
+
+            # Calcular los rendimientos logarítmicos
+            df['log_return'] = np.log(df['close'] / df['close'].shift(1))
+            df = df.dropna()
+
+            # Calcular la desviación estándar de los rendimientos
+            volatility = df['log_return'].std()
+
+            logger.debug(f"Volatilidad calculada para {symbol}: {volatility:.6f}")
+
+            return volatility
+
+        except Exception as e:
+            logger.error(f"Error al calcular la volatilidad del mercado: {e}")
+            return None

@@ -39,7 +39,7 @@ class BinanceMarketClient(BaseClient):
             logger.debug(f"Precio de {symbol}: {price}")
             return price
         else:
-            logger.error(f"No se pudo obtener el precio para {symbol}.")
+            logger.debug(f"No se pudo obtener el precio para {symbol}.")
             return None
 
     def get_top_cryptocurrencies(self, top_n: int = 10, by: str = "price") -> List[Dict[str, Any]]:
@@ -50,7 +50,7 @@ class BinanceMarketClient(BaseClient):
         market_data = self.get(endpoint)
 
         if not market_data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [pair for pair in market_data if pair["symbol"].endswith("USDT")]
@@ -93,7 +93,7 @@ class BinanceMarketClient(BaseClient):
             # logger.info(f"Datos históricos obtenidos para {symbol}.")
             return data
         else:
-            logger.error("Error al obtener datos históricos.")
+            logger.debug(f"debug al obtener datos históricos. Endpoint: {endpoint} | Params: {params} | Response: {data}")
             return None
 
     def get_top_gainers(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -104,7 +104,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -120,7 +120,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -136,7 +136,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -152,7 +152,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -169,7 +169,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -186,7 +186,7 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint)
 
         if not data:
-            logger.error("No se pudo obtener información del mercado.")
+            logger.debug("No se pudo obtener información del mercado.")
             return []
 
         usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
@@ -194,3 +194,29 @@ class BinanceMarketClient(BaseClient):
         popular_extra_low_price_sorted = sorted(popular_extra_low_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio muy bajo: {popular_extra_low_price_sorted}")
         return popular_extra_low_price_sorted
+    
+    def get_popular_by_price_range(self, min_price: float, max_price: float, limit: int = 10) -> List[Dict[str, Any]]:
+        """
+        Obtiene las criptomonedas populares dentro de un rango de precios.
+        
+        :param min_price: Precio mínimo para filtrar.
+        :param max_price: Precio máximo para filtrar.
+        :param limit: Número máximo de resultados a devolver.
+        :return: Lista de criptomonedas populares dentro del rango de precios.
+        """
+        endpoint = "api/v3/ticker/24hr"
+        data = self.get(endpoint)
+
+        if not data:
+            logger.debug("No se pudo obtener información del mercado.")
+            return []
+
+        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
+        filtered_pairs = [
+            coin for coin in usdt_pairs 
+            if min_price <= float(coin['lastPrice']) <= max_price
+        ]
+        sorted_pairs = sorted(filtered_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        logger.debug(f"Criptomonedas populares en rango {min_price}-{max_price}: {sorted_pairs}")
+        return sorted_pairs
+

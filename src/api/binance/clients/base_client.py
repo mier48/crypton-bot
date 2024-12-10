@@ -32,6 +32,7 @@ class BaseClient:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"GET request failed: {e}")
+            logger.debug(f"Endpoint: {url}, Params: {params}, Headers: {headers}")
             return None
 
     def post(self, endpoint: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
@@ -43,6 +44,16 @@ class BaseClient:
             response = self.session.post(url, params=params, headers=headers, timeout=self.timeout)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"POST request failed: {e}")
+        except requests.exceptions.HTTPError as http_err:
+            # Intenta obtener más detalles del error
+            try:
+                error_info = response.json()
+                logger.error(f"HTTP error occurred: {http_err} - Detalles: {error_info}")
+            except ValueError:
+                # Si la respuesta no es JSON, simplemente registra el texto
+                logger.error(f"HTTP error occurred: {http_err} - Respuesta: {response.text}")
+            return None
+        except requests.exceptions.RequestException as req_err:
+            # Maneja otras excepciones de Requests
+            logger.error(f"Request exception occurred: {req_err}")
             return None

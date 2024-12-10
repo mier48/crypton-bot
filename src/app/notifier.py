@@ -1,5 +1,8 @@
+# src/app/notifier.py
+
 import requests
 from typing import Optional
+from datetime import datetime
 from utils.logger import setup_logger
 from config.telegram import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 
@@ -91,49 +94,45 @@ class TelegramNotifier:
         :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
         :return: Mensaje formateado.
         """
-        if side.upper() == "BUY":
-            return (
-                f"🟢 *COMPRA EJECUTADA*\n"
-                f"🔹 *Activo:* {symbol}\n"
-                f"🔹 *Cantidad comprada:* {quantity:.6f} unidades\n"
-                f"🔹 *Precio de compra:* ${price:.6f}\n"
-                f"🔹 *Total invertido:* ${quantity * price:.2f}\n"
-                f"💵 *Balance restante:* ${initial_balance:.2f}\n"
-                f"\n📈 ¡Esperamos que suba pronto! 🚀"
-            )
-        elif side.upper() == "SELL":
+        header = "🟢 *COMPRA EJECUTADA*" if side.upper() == "BUY" else "🔴 *VENTA EJECUTADA*"
+        emoji_reason = {
+            "STOP_LOSS": "🚨 *STOP LOSS ACTIVADO* 🚨",
+            "PROFIT_TARGET": "🎯 *OBJETIVO DE GANANCIA ALCANZADO* 🎯",
+        }
+        reason_text = emoji_reason.get(reason, header)
+
+        base_message = (
+            f"{reason_text}\n"
+            f"🔹 *Activo:* `{symbol}`\n"
+            f"🔹 *Cantidad:* `{quantity:.2f}` unidades\n"
+            f"🔹 *Precio:* `${price:,.6f}`\n"
+            f"🔹 *Total:* `${quantity * price:,.2f}`\n"
+            f"💵 *Balance:* `${initial_balance:,.2f}`\n"
+        )
+
+        if side.upper() == "SELL":
             if reason == "STOP_LOSS":
-                return (
-                    f"🚨 *STOP LOSS ACTIVADO* 🚨\n"
-                    f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
-                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
-                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
-                    f"🔹 *Pérdida:* {percentage_gain:.2f}%\n"
-                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
-                    f"\n⚠️ Se ha limitado la pérdida según la estrategia de stop loss."
+                base_message += (
+                    f"🔻 *Pérdida:* `{percentage_gain:.2f}%`\n"
+                    f"⚠️ _Estrategia de stop loss aplicada._"
                 )
             elif reason == "PROFIT_TARGET":
-                return (
-                    f"🎯 *OBJETIVO DE GANANCIA ALCANZADO* 🎯\n"
-                    f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
-                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
-                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
-                    f"🔹 *Ganancia:* {percentage_gain:.2f}%\n"
-                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
-                    f"\n💰 ¡Ganancia asegurada! 🎉"
+                base_message += (
+                    f"🟢 *Ganancia:* `{percentage_gain:.2f}%`\n"
+                    f"💰 _Ganancia asegurada._"
                 )
             else:
-                return (
-                    f"🔴 *VENTA EJECUTADA*\n"
-                    f"🔹 *Activo:* {symbol}\n"
-                    f"🔹 *Cantidad vendida:* {quantity:.2f} unidades\n"
-                    f"🔹 *Precio de venta:* ${price:,.6f}\n"
-                    f"🔹 *Total vendido:* ${quantity * price:,.2f}\n"
-                    f"🔹 *Beneficios:* {percentage_gain:.2f}%\n"
-                    f"💵 *Balance actual:* ${initial_balance:,.2f}\n"
-                    f"\n💰 ¡Operación ejecutada! 🎉"
+                base_message += (
+                    f"🔵 *Beneficios:* `{percentage_gain:.2f}%`\n"
+                    f"📊 _Operación completada._"
                 )
-        else:
-            raise ValueError(f"Dirección inválida para la operación: {side}")
+        elif side.upper() == "BUY":
+            base_message += "📈 _¡Esperamos que suba pronto! 🚀_"
+
+        # Pie del mensaje
+        footer = (
+            "\n📅 *Fecha y hora:* "
+            f"`{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n"
+            "🔔 _Notificación generada automáticamente._"
+        )
+        return base_message + footer

@@ -2,6 +2,9 @@
 venv/
 .env
 
+# Archivos obsoletos
+archive/
+
 # Cachés de Python
 __pycache__/
 *.py[cod]

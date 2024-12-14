@@ -1,12 +1,12 @@
 from typing import Dict
 
-DEFAULT_PROFIT_MARGIN = 2.5 # 2.5% de margen de beneficio
+DEFAULT_PROFIT_MARGIN = 3 # 3% de margen de beneficio
 DEFAULT_SLEEP_INTERVAL = 90 # 90 segundos de intervalo de espera
 DEFAULT_INVESTMENT_AMOUNT = 25 # $25 de inversión por operación
 DEFAULT_MAX_BUY_PRICE = 5 # $5 de precio máximo unitario de compra
 DEFAULT_LOT_SIZE_FILTER = "LOT_SIZE" # Filtro de tamaño de lote
 DEFAULT_VALIDATION_MIN_SCORE = 5 # Puntuación mínimo de validación
-DEFAULT_STOP_LOSS_MARGIN = 12 # 12% de margen de stop loss
+DEFAULT_STOP_LOSS_MARGIN = 25 # 25% de margen de stop loss
 DEFAULT_CHECK_PRICE_INTERVAL = "5m" # Intervalo de precios de 5 minutos a la api de binance
 DEFAULT_HISTORICAL_RANGE_HOURS = 5 * 24 # 7 días de rango histórico de precios a la api de binance
 DEFAULT_USE_OPEN_AI_API = False # No usar la API de OpenAI por defecto

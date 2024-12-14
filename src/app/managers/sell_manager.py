@@ -164,11 +164,11 @@ class SellManager:
                 percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
 
                 logging.info(f"Asset: {asset['asset']}")
-                logging.info(f"Precio Actual: ${current_price:,.6f}")
+                logging.info(f"Precio Actual: ${current_price:,.8f}")
                 logging.info(f"Posiciones abiertas: {real_balance:,.2f}")
-                logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.6f}")
-                logging.info(f"Precio Objetivo de Venta: ${target_price:,.6f}")
-                logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.6f}")
+                logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.8f}")
+                logging.info(f"Precio Objetivo de Venta: ${target_price:,.8f}")
+                logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.8f}")
                 logging.info(f"Porcentaje de Ganancia: {percentage_gain:.2f}%")
                 # logging.info(f"Porcentaje de Pérdida: {percentage_loss:.2f}%")
 

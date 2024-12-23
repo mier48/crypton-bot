@@ -3,21 +3,21 @@
 [![Version: 2.0.0-beta](https://img.shields.io/badge/Version-2.0.0--beta-blue.svg)](./README.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**Crypton Bot** es un bot de trading automatizado diseñado para operar activos de alto volumen y bajo costo en exchanges de criptomonedas. Combina eficiencia y simplicidad para maximizar tus operaciones.
+**Crypton Bot** is an automated trading bot designed to handle high-volume, low-cost assets on cryptocurrency exchanges. It combines efficiency and simplicity to maximize your trading activities.
 
 
-## 📜 Licencia
+## 📜 License
 
-Este proyecto está bajo la licencia [MIT](LICENSE).
-
----
-
-## 🤝 Contribuciones
-
-¡Las contribuciones son bienvenidas! Por favor, abre un issue o envía un pull request.
+This project is under the [MIT](LICENSE) license.
 
 ---
 
-## ✨ Créditos
+## 🤝 Contributions
 
-Desarrollado por Alberto Mier. Si tienes dudas, contacta en [info@albertomier.com].
+Contributions are welcome! Please open an issue or submit a pull request.
+
+---
+
+## ✨ Credits
+
+Developed by Alberto Mier. If you have any questions, contact [info@albertomier.com].

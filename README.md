@@ -55,10 +55,6 @@
   - `TensorFlow`, `Scikit-learn` for AI and ML.
   - `TextBlob`, `OpenAI API` for sentiment analysis.
   - `CCXT` for exchange integrations.
-- **Infrastructure**:
-  - `Docker`, `Kubernetes` for scalable deployment.
-  - `MongoDB`, `PostgreSQL` for data storage.
-  - `AWS`, `GCP`, `Azure` for cloud hosting.
 
 ---
 

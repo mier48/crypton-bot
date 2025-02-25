@@ -1,5 +1,3 @@
-# src/app/analyzers/pre_trade_analyzer.py
-
 from typing import Tuple, List, Dict
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed

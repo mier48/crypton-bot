@@ -1,5 +1,3 @@
-# src/app/managers/trade_manager.py
-
 import time
 from concurrent.futures import ThreadPoolExecutor
 from utils.logger import setup_logger

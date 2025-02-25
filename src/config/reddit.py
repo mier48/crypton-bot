@@ -1,7 +1,6 @@
 import os
 from dotenv import load_dotenv
 
-# Cargar el archivo .env
 load_dotenv()
 
 REDDIT_CLIENT_ID = os.getenv("REDDIT_CLIENT_ID")

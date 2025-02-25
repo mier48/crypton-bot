@@ -1,5 +1,3 @@
-# src/app/managers/sell_manager.py
-
 import time
 from typing import List, Dict, Any
 from prettytable import PrettyTable

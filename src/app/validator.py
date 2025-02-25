@@ -6,43 +6,43 @@ logger = setup_logger(__name__)
 
 def get_decimals_for_symbol(symbol_data: Dict[str, Any], symbol_name: str) -> Optional[int]:
     """
-    Determina la cantidad de decimales permitidos para un símbolo en función del filtro LOT_SIZE.
+    Determines the number of allowed decimals for a symbol based on the LOT_SIZE filter.
 
     Args:
-        symbol_data (dict): Datos de la API de Binance (respuesta completa).
-        symbol_name (str): Nombre del símbolo, por ejemplo, "BTCUSDT".
+        symbol_data (dict): Binance API data (full response).
+        symbol_name (str): Symbol name, e.g., "BTCUSDT".
 
     Returns:
-        int: Número de decimales permitidos para la cantidad.
-        None: Si no se encuentra el símbolo o no se puede determinar el número de decimales.
+        int: Number of allowed decimals for the quantity.
+        None: If the symbol is not found or the number of decimals cannot be determined.
     """
     try:
-        # Validar la estructura de los datos
+        # Validate data structure
         symbols = symbol_data.get("symbols", [])
         if not isinstance(symbols, list):
-            logger.error("Estructura inválida en symbol_data: no contiene una lista de símbolos.")
+            logger.error("Invalid structure in symbol_data: does not contain a list of symbols.")
             return None
 
-        # Buscar el símbolo específico
+        # Search for the specific symbol
         for symbol in symbols:
             if symbol.get("symbol") == symbol_name:
-                # Buscar el filtro LOT_SIZE
+                # Look for the LOT_SIZE filter
                 filters = symbol.get("filters", [])
                 if not isinstance(filters, list):
-                    logger.error(f"Estructura inválida en los filtros para el símbolo {symbol_name}.")
+                    logger.error(f"Invalid structure in filters for symbol {symbol_name}.")
                     return None
 
                 for filter_item in filters:
                     if filter_item.get("filterType") == LOT_SIZE_FILTER:
                         step_size = filter_item.get("stepSize", "1.00")
                         if isinstance(step_size, str) and "." in step_size:
-                            # Contar los decimales significativos
+                            # Count significant decimals
                             return len(step_size.split(".")[1].rstrip("0"))
-                        return 0  # Sin decimales si stepSize es un número entero
+                        return 0  # No decimals if stepSize is an integer
 
-        logger.warning(f"No se encontró el símbolo {symbol_name} o el filtro {LOT_SIZE_FILTER}.")
+        logger.warning(f"Symbol {symbol_name} or filter {LOT_SIZE_FILTER} not found.")
         return None
 
     except Exception as e:
-        logger.exception(f"Error al obtener decimales para el símbolo {symbol_name}: {e}")
+        logger.exception(f"Error retrieving decimals for symbol {symbol_name}: {e}")
         return None

@@ -1,5 +1,3 @@
-# src/utils/console_styler.py
-
 from typing import Dict
 from colorama import Fore, Style
 

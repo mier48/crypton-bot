@@ -1,5 +1,3 @@
-# src/app/notifier.py
-
 import requests
 from typing import Optional
 from datetime import datetime
@@ -11,7 +9,7 @@ logger = setup_logger(__name__)
 class TelegramNotifier:
     def __init__(self):
         """
-        Inicializa el bot de Telegram para enviar notificaciones.
+        Initializes the Telegram bot for sending notifications.
         """
         self.bot_token = TELEGRAM_BOT_TOKEN
         self.chat_id = TELEGRAM_CHAT_ID
@@ -19,26 +17,26 @@ class TelegramNotifier:
 
     def send_message(self, message: str, parse_mode: str = "Markdown") -> bool:
         """
-        Envía un mensaje de texto a través de Telegram.
+        Sends a text message via Telegram.
 
-        :param message: Mensaje a enviar.
-        :param parse_mode: Formato del mensaje (e.g., "Markdown").
-        :return: True si se envió correctamente, False de lo contrario.
+        :param message: Message to send.
+        :param parse_mode: Message format (e.g., "Markdown").
+        :return: True if successfully sent, False otherwise.
         """
         data = {"chat_id": self.chat_id, "text": message, "parse_mode": parse_mode}
 
         try:
             response = requests.post(self.api_url_send, data=data)
             if response.status_code == 200:
-                logger.info(f"[Telegram] Mensaje enviado: {message[:50]}...")
+                logger.info(f"[Telegram] Message sent: {message[:50]}...")
                 return True
             else:
                 logger.error(
-                    f"[Telegram] Error al enviar mensaje: {response.status_code}, {response.text}"
+                    f"[Telegram] Error sending message: {response.status_code}, {response.text}"
                 )
                 return False
         except requests.RequestException as e:
-            logger.exception(f"[Telegram] Excepción al enviar mensaje: {e}")
+            logger.exception(f"[Telegram] Exception sending message: {e}")
             return False
 
     def notify_trade(
@@ -52,16 +50,16 @@ class TelegramNotifier:
         reason: Optional[str] = None,
     ) -> bool:
         """
-        Envía una notificación específica de compra o venta.
+        Sends a specific buy or sell notification.
 
-        :param side: "BUY" o "SELL".
-        :param symbol: Símbolo del activo (e.g., BTCUSDT).
-        :param quantity: Cantidad operada.
-        :param price: Precio de la operación.
-        :param initial_balance: Balance disponible tras la operación.
-        :param percentage_gain: Porcentaje de ganancia o pérdida en caso de venta (opcional).
-        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
-        :return: True si se envió correctamente, False de lo contrario.
+        :param side: "BUY" or "SELL".
+        :param symbol: Asset symbol (e.g., BTCUSDT).
+        :param quantity: Traded quantity.
+        :param price: Trade price.
+        :param initial_balance: Available balance after trade.
+        :param percentage_gain: Profit or loss percentage in case of a sale (optional).
+        :param reason: Reason for the trade (e.g., "PROFIT_TARGET", "STOP_LOSS").
+        :return: True if successfully sent, False otherwise.
         """
         try:
             message = self._build_trade_message(
@@ -69,7 +67,7 @@ class TelegramNotifier:
             )
             return self.send_message(message)
         except ValueError as e:
-            logger.error(f"[Telegram] Error al generar mensaje de notificación: {e}")
+            logger.error(f"[Telegram] Error generating notification message: {e}")
             return False
 
     def _build_trade_message(
@@ -83,29 +81,29 @@ class TelegramNotifier:
         reason: Optional[str] = None,
     ) -> str:
         """
-        Construye el mensaje de notificación para operaciones de compra o venta.
+        Builds the notification message for buy or sell operations.
 
-        :param side: "BUY" o "SELL".
-        :param symbol: Símbolo del activo.
-        :param quantity: Cantidad operada.
-        :param price: Precio de la operación.
-        :param initial_balance: Balance disponible tras la operación.
-        :param percentage_gain: Porcentaje de ganancia o pérdida en caso de venta.
-        :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
-        :return: Mensaje formateado.
+        :param side: "BUY" or "SELL".
+        :param symbol: Asset symbol.
+        :param quantity: Traded quantity.
+        :param price: Trade price.
+        :param initial_balance: Available balance after trade.
+        :param percentage_gain: Profit or loss percentage in case of a sale.
+        :param reason: Reason for the trade (e.g., "PROFIT_TARGET", "STOP_LOSS").
+        :return: Formatted message.
         """
-        header = "🟢 *COMPRA EJECUTADA*" if side.upper() == "BUY" else "🔴 *VENTA EJECUTADA*"
+        header = "🟢 *BUY EXECUTED*" if side.upper() == "BUY" else "🔴 *SELL EXECUTED*"
         emoji_reason = {
-            "STOP_LOSS": "🚨 *STOP LOSS ACTIVADO* 🚨",
-            "PROFIT_TARGET": "🎯 *OBJETIVO DE GANANCIA ALCANZADO* 🎯",
+            "STOP_LOSS": "🚨 *STOP LOSS TRIGGERED* 🚨",
+            "PROFIT_TARGET": "🎯 *PROFIT TARGET REACHED* 🎯",
         }
         reason_text = emoji_reason.get(reason, header)
 
         base_message = (
             f"{reason_text}\n"
-            f"🔹 *Activo:* `{symbol}`\n"
-            f"🔹 *Cantidad:* `{quantity:.2f}` unidades\n"
-            f"🔹 *Precio:* `${price:,.6f}`\n"
+            f"🔹 *Asset:* `{symbol}`\n"
+            f"🔹 *Quantity:* `{quantity:.2f}` units\n"
+            f"🔹 *Price:* `${price:,.6f}`\n"
             f"🔹 *Total:* `${quantity * price:,.2f}`\n"
             f"💵 *Balance:* `${initial_balance:,.2f}`\n"
         )
@@ -113,26 +111,26 @@ class TelegramNotifier:
         if side.upper() == "SELL":
             if reason == "STOP_LOSS":
                 base_message += (
-                    f"🔻 *Pérdida:* `{percentage_gain:.2f}%`\n"
-                    f"⚠️ _Estrategia de stop loss aplicada._"
+                    f"🔻 *Loss:* `{percentage_gain:.2f}%`\n"
+                    f"⚠️ _Stop loss strategy applied._"
                 )
             elif reason == "PROFIT_TARGET":
                 base_message += (
-                    f"🟢 *Ganancia:* `{percentage_gain:.2f}%`\n"
-                    f"💰 _Ganancia asegurada._"
+                    f"🟢 *Profit:* `{percentage_gain:.2f}%`\n"
+                    f"💰 _Profit secured._"
                 )
             else:
                 base_message += (
-                    f"🔵 *Beneficios:* `{percentage_gain:.2f}%`\n"
-                    f"📊 _Operación completada._"
+                    f"🔵 *Benefits:* `{percentage_gain:.2f}%`\n"
+                    f"📊 _Trade completed._"
                 )
         elif side.upper() == "BUY":
-            base_message += "📈 _¡Esperamos que suba pronto! 🚀_"
+            base_message += "📈 _Hoping for an increase soon! 🚀_"
 
-        # Pie del mensaje
+        # Message footer
         footer = (
-            "\n📅 *Fecha y hora:* "
+            "\n📅 *Date and time:* "
             f"`{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`\n"
-            "🔔 _Notificación generada automáticamente._"
+            "🔔 _Automatically generated notification._"
         )
         return base_message + footer

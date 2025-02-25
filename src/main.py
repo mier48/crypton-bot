@@ -1,5 +1,3 @@
-# src/main.py
-
 from app.managers.trade_manager import TradeManager
 from config.default import (
     DEFAULT_PROFIT_MARGIN,

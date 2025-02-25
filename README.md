@@ -75,7 +75,6 @@ Copy the provided `.env.example` file and rename it to `.env`:
 cp .env.example .env
 ```
 Then, edit the `.env` file and replace the placeholder values with your actual API credentials.
-```
 
 ### 4️⃣ Run the Bot
 ```bash

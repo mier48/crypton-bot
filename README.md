@@ -138,4 +138,3 @@ This project is licensed under the [MIT License](LICENSE).
 
 Developed by **Alberto Mier**.  
 For inquiries, contact me at: [info@albertomier.com](mailto:info@albertomier.com)
-```

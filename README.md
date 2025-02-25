@@ -29,7 +29,6 @@
  │   ├── 📁 managers/           # Buy and sell strategy management
  │   ├── notifier.py            # Notifications and alerts
  │   ├── validator.py           # Order and asset validation
- │   ├── main.py                # Bot entry point
  │
  ├── 📁 api/                    # Connectors for Binance, OpenAI, CoinGecko, etc.
  │   ├── 📁 binance/            # Binance API integration
@@ -42,10 +41,8 @@
  │
  ├── 📁 utils/                  # General utilities
  │   ├── logger.py              # Logging system
- │
- ├── requirements.txt           # Project dependencies
- ├── README.md                  # Documentation
- ├── LICENSE                    # MIT License
+ │ 
+ ├── main.py                    # Bot entry point
 ```
 
 ---

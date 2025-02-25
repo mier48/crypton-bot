@@ -52,9 +52,7 @@
 - **Language**: Python 🐍
 - **Frameworks & Libraries**:
   - `Pandas`, `NumPy` for data analysis.
-  - `TensorFlow`, `Scikit-learn` for AI and ML.
   - `TextBlob`, `OpenAI API` for sentiment analysis.
-  - `CCXT` for exchange integrations.
 
 ---
 

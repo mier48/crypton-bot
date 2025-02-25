@@ -70,12 +70,11 @@ pip install -r requirements.txt
 ```
 
 ### 3️⃣ Configure Environment Variables
-Create a `.env` file with your credentials:
-```ini
-BINANCE_API_KEY="your_api_key"
-BINANCE_SECRET_KEY="your_api_secret"
-TELEGRAM_BOT_TOKEN="your_telegram_bot_token"
-TELEGRAM_CHAT_ID="your_chat_id"
+Copy the provided `.env.example` file and rename it to `.env`:
+```bash
+cp .env.example .env
+```
+Then, edit the `.env` file and replace the placeholder values with your actual API credentials.
 ```
 
 ### 4️⃣ Run the Bot

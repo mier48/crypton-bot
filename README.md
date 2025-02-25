@@ -27,8 +27,8 @@
  │   ├── 📁 analyzers/          # Market and sentiment analysis modules
  │   ├── 📁 executors/          # Order execution modules
  │   ├── 📁 managers/           # Buy and sell strategy management
- │   ├── 📁 notifier/           # Notifications and alerts
- │   ├── 📁 validators/         # Order and asset validation
+ │   ├── notifier.py            # Notifications and alerts
+ │   ├── validator.py           # Order and asset validation
  │   ├── main.py                # Bot entry point
  │
  ├── 📁 api/                    # Connectors for Binance, OpenAI, CoinGecko, etc.

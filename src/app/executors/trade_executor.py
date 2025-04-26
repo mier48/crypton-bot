@@ -1,7 +1,7 @@
 from typing import Optional, Dict, TypedDict
 from api.binance.data_manager import BinanceDataManager
 from utils.logger import setup_logger
-from app.notifier import TelegramNotifier
+from app.notifiers.telegram_notifier import TelegramNotifier
 from app.validator import get_decimals_for_symbol
 
 logger = setup_logger(__name__)
@@ -29,7 +29,7 @@ class TradeExecutor:
         Ejecuta una orden de compra o venta en Binance y envía una notificación.
 
         :param side: Dirección de la operación ("BUY" o "SELL").
-        :param symbol: Símbolo de la criptomoneda (e.g., "BTCUSDT").
+        :param symbol: Símbolo de la criptomoneda (e.g., "BTCUSDC").
         :param order_type: Tipo de orden (e.g., "LIMIT", "MARKET").
         :param positions: Cantidad a operar.
         :param reason: Motivo de la operación (e.g., "PROFIT_TARGET", "STOP_LOSS").
@@ -106,7 +106,7 @@ class TradeExecutor:
         )
 
         balances = self.data_manager.get_balance_summary()
-        initial_balance = self._get_balance(balances, "USDT")
+        initial_balance = self._get_balance(balances, "USDC")
 
         self.notifier.notify_trade(
             side, 

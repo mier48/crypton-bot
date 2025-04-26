@@ -10,7 +10,18 @@ from typing import Optional
 logger = setup_logger()
 
 class OpenAIClient:
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super(OpenAIClient, cls).__new__(cls)
+        return cls._instance
+
     def __init__(self, model: str = MODEL, tokenizer_model: str = TOKENIZER_MODEL) -> None:
+        if self._initialized:
+            return
+        self._initialized = True
         """
         Inicializa el cliente para interactuar con la API de OpenAI.
         :param model: Modelo por defecto (e.g., "gpt-4").
@@ -18,7 +29,7 @@ class OpenAIClient:
         """
         if not OPENAI_API_KEY:
             raise ValueError("La clave de API de OpenAI no está configurada.")
-        
+
         self.api_key = OPENAI_API_KEY
         self.client = OpenAI(api_key=self.api_key)
         self.model = model

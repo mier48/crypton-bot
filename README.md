@@ -1,140 +1,110 @@
 # Crypton Bot 🚀🤖
 
-[![Version: 2.0.0-beta](https://img.shields.io/badge/Version-2.0.0--beta-blue.svg)](./README.md)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Version: 2.1.0](https://img.shields.io/badge/Version-2.1.0-blue.svg)](./README.md)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
-**Crypton Bot** is an automated trading bot designed to operate with cryptocurrencies across multiple exchanges. It leverages advanced trading strategies based on technical analysis, artificial intelligence, and natural language processing to optimize buying and selling decisions.
-
----
-
-## ⚙️ Key Features
-
-- **📈 Advanced Technical Analysis**: Utilizes indicators such as RSI, MACD, Bollinger Bands, and ADX to assess market trends.
-- **🧠 Artificial Intelligence**: Implements machine learning models (RNN, LSTM) for price predictions and sentiment analysis with OpenAI.
-- **🔄 Full Automation**: Executes buy and sell orders automatically based on market analysis and user-defined settings.
-- **💬 Real-Time Notifications**: Telegram integration for instant alerts on executed trades.
-- **📊 Portfolio Management**: Tracks real-time asset performance, executed trades, and profitability.
-- **🔗 Multiple Data Sources**: Gathers market data from Binance, CoinGecko, Reddit, and NewsAPI for comprehensive analysis.
-- **🛡️ Security & Compliance**: Secure authentication, encrypted API key management, and regulatory compliance with KYC/AML.
+**Crypton Bot** es un bot de trading de criptomonedas totalmente automatizado que combina análisis técnico, machine learning y AI para optimizar decisiones de compra y venta.
 
 ---
 
-## 🏗️ Project Architecture
+## ⚙️ Características Principales
+
+- **📈 Análisis Técnico Avanzado**: RSI, MACD, Bollinger Bands, ADX y más para evaluar tendencias.
+- **🔍 Detección de Burbujas**: Módulo `BubbleDetector` evita compras en activos con subidas anómalas.
+- **🔄 Adaptador de Estrategias Dinámicas**: Selecciona Trend Following, Mean Reversion, Breakout o Scalping según régimen de mercado.
+- **⚖️ Dimensión Proporcional al Riesgo**: `InvestmentCalculator` ajusta porcentaje de inversión según puntuación de confianza.
+- **🔔 Notificaciones Multi-Canal**: Telegram (ampliable a WhatsApp, Email…) con mensajes enriquecidos.
+- **🛑 Trailing Stop-Loss Dinámico**: Captura beneficios máximos y ajusta stop loss automáticamente.
+- **🤖 AI y Sentiment Analysis**: OpenAI y análisis de noticias/redes para decisiones informadas.
+- **🔗 Múltiples APIs**: Binance, CoinGecko, NewsAPI, Reddit, etc.
+
+---
+
+## 🏗️ Arquitectura del Proyecto
 
 ```
-📂 src/
- ├── 📁 app/                    # Core bot logic
- │   ├── 📁 analyzers/          # Market and sentiment analysis modules
- │   ├── 📁 executors/          # Order execution modules
- │   ├── 📁 managers/           # Buy and sell strategy management
- │   ├── notifier.py            # Notifications and alerts
- │   ├── validator.py           # Order and asset validation
- │
- ├── 📁 api/                    # Connectors for Binance, OpenAI, CoinGecko, etc.
- │   ├── 📁 binance/            # Binance API integration
- │   ├── 📁 coingecko/          # CoinGecko API integration
- │   ├── 📁 news/               # News and social media data sources
- │
- ├── 📁 config/                 # Bot configuration
- │   ├── default.py             # Default settings
- │   ├── telegram.py            # Telegram configuration
- │
- ├── 📁 utils/                  # General utilities
- │   ├── logger.py              # Logging system
- │ 
- ├── main.py                    # Bot entry point
+src/
+├── app/
+│   ├── analyzers/            # MarketAnalyzer, SentimentAnalyzer, BubbleDetector, PreTradeAnalyzer
+│   ├── executors/            # TradeExecutor (envío de órdenes)
+│   ├── managers/             # BuyManager, SellManager, TradeManager
+│   ├── notifiers/            # TelegramNotifier (y futuros servicios)
+│   └── services/             # PriceCalculator, QuantityCalculator, SellDecisionEngine, StrategyAdapter, InvestmentCalculator
+├── api/                      # Integraciones con Binance, CoinGecko, OpenAI, News
+├── config/                   # Ajustes y parámetros (default.py, container.py, telegram.py)
+├── utils/                    # Logger, helpers
+└── main.py                   # Punto de entrada
 ```
 
 ---
 
-## 📌 Technologies Used
+## 📌 Tecnologías
 
-- **Language**: Python 🐍
-- **Frameworks & Libraries**:
-  - `Pandas`, `NumPy` for data analysis.
-  - `TextBlob`, `OpenAI API` for sentiment analysis.
+- **Python** 🐍
+- **Librerías**: pandas, numpy, requests, prettytable
+- **AI & NLP**: OpenAI API, TextBlob
 
 ---
 
-## 🚀 Installation & Setup
+## 🚀 Instalación y Ejecución
 
-### 1️⃣ Clone the Repository
 ```bash
 git clone https://github.com/yourusername/crypton-bot.git
 cd crypton-bot
-```
-
-### 2️⃣ Install Dependencies
-```bash
 pip install -r requirements.txt
-```
-
-### 3️⃣ Configure Environment Variables
-Copy the provided `.env.example` file and rename it to `.env`:
-```bash
-cp .env.example .env
-```
-Then, edit the `.env` file and replace the placeholder values with your actual API credentials.
-
-### 4️⃣ Run the Bot
-```bash
+cp .env.example .env  # configurar claves y settings
 python src/main.py
 ```
 
 ---
 
-## 📊 Strategy Configuration
+## ⚙️ Configuración de Estrategias y Parámetros
 
-The bot allows strategy customization via `config/default.py`:
-
+En `config/default.py`:
+```python
+BUBBLE_DETECT_WINDOW = 12       # Velas para medir crecimiento
+BUBBLE_MAX_GROWTH = 5.0         # % máximo permitido en ese window
+DEFAULT_PROFIT_MARGIN = 1.5     # % objetivo de ganancia
+DEFAULT_STOP_LOSS_MARGIN = 2.0  # % stop-loss
+DEFAULT_INvestMENT_AMOUNT = 50  # USDC por trade
+DEFAULT_SLEEP_INTERVAL = 60     # segundos entre ciclos
 ```
-DEFAULT_PROFIT_MARGIN = 1.5  # Profit margin in %
-DEFAULT_STOP_LOSS_MARGIN = 2.0  # Stop loss in %
-DEFAULT_INVESTMENT_AMOUNT = 50  # Investment per trade in USDT
-DEFAULT_SLEEP_INTERVAL = 60  # Interval between executions (seconds)
-```
-
-You can also adjust trading strategies in:
-- `app/analyzers/market_analyzer.py` (Technical analysis)
-- `app/analyzers/pre_trade_analyzer.py` (Market conditions analysis)
-- `app/analyzers/sentiment_analyzer.py` (Sentiment analysis)
+Y en `config/settings.py` o `.env`:
+- Ajusta `PROFIT_MARGIN`, `STOP_LOSS_MARGIN`, `MIN_TRADE_USD`, etc.
 
 ---
 
-## 📢 Trading Notifications
+## 📢 Notificaciones de Trading
 
-The bot sends real-time alerts via Telegram when trades are executed.
-
-Example notification:
+Ejemplo de mensaje en Telegram:
 ```
-🟢 TRADE EXECUTED
-🔹 Asset: BTCUSDT
-🔹 Quantity: 0.002 BTC
-🔹 Price: $45,000.00
-💵 Balance: $500.00
-📅 Date & Time: 2025-02-25 14:30:00
+🟢 *PROFIT TARGET REACHED* _(at 2025-04-26 00:23:00)_
+*Asset:* `BTCUSDC`
+*Side:* `SELL`
+*Quantity:* `0.0050`
+*Price:* `$45,200.1234`
+*Total:* `$226.00`
+*Balance:* `$774.00`
+🟢 *P&L:* `+2.00%`
+🔔 _Automatically generated notification_
 ```
 
-To enable notifications, configure the settings in `config/telegram.py` and `.env`.
+---
+
+## 🛠️ Contribuciones
+
+¡Contribuciones bienvenidas!:
+1. Haz un fork
+2. Crea rama (`git checkout -b feature/x`)
+3. Envía PR
 
 ---
 
-## 🛠️ Contributing
+## 📜 Licencia
 
-Contributions are welcome! 🛠️ If you'd like to improve this project:
-1. **Fork** this repository.
-2. **Create a new branch** (`git checkout -b feature-new-feature`).
-3. **Make changes and submit a PR**.
+MIT © **Alberto Mier**
 
 ---
 
-## 📜 License
+## 📧 Contacto
 
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 📧 Contact
-
-Developed by **Alberto Mier**.  
-For inquiries, contact me at: [info@albertomier.com](mailto:info@albertomier.com)
+Alberto Mier – [info@albertomier.com](mailto:info@albertomier.com)

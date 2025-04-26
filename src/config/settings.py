@@ -1,5 +1,7 @@
 from pydantic import BaseSettings, Field
 from config.default import DEFAULT_CHECK_PRICE_INTERVAL, DEFAULT_HISTORICAL_RANGE_HOURS
+from datetime import datetime, timezone
+from typing import Dict, Any
 
 class Settings(BaseSettings):
     MAX_RECORDS: int = Field(500, env="MAX_RECORDS")
@@ -16,6 +18,14 @@ class Settings(BaseSettings):
     # Interval settings
     DEFAULT_CHECK_PRICE_INTERVAL: str = Field(DEFAULT_CHECK_PRICE_INTERVAL, env="DEFAULT_CHECK_PRICE_INTERVAL")
     DEFAULT_HISTORICAL_RANGE_HOURS: int = Field(DEFAULT_HISTORICAL_RANGE_HOURS, env="DEFAULT_HISTORICAL_RANGE_HOURS")
+    OPTUNA_PARAM_SPACE: Dict[str, Any] = Field(
+        { 'sma_period': (5, 50), 'rsi_threshold': (20, 80) }, env=None
+    )
+    OPTUNA_TRIALS: int = Field(50, env="OPTUNA_TRIALS")
+    BACKTEST_START: datetime = Field(datetime(2025, 1, 1, tzinfo=timezone.utc), env=None)
+    BACKTEST_END: datetime   = Field(datetime(2025, 4, 1, tzinfo=timezone.utc), env=None)
+    OVERFITTING_THRESHOLD: float = Field(0.1, env="OVERFITTING_THRESHOLD")
+    ANOMALY_CONTAMINATION: float = Field(0.01, env="ANOMALY_CONTAMINATION")
 
     class Config:
         env_file = ".env"

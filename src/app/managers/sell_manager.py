@@ -118,6 +118,16 @@ class SellManager(SellUseCase):
             try:
                 symbol = f"{asset['asset']}USDC"
                 asset_orders = self.data_provider.get_all_orders(symbol)
+                # Venta rápida si fue compra bajo override de burbuja
+                from app.utils.bubble_registry import get_and_clear_all
+                quick_syms = get_and_clear_all()
+                if symbol in quick_syms:
+                    logging.info(f"Venta rápida por bubble_override para {symbol}.")
+                    current_price = float(self.data_provider.get_price(symbol))
+                    real_balance = float(asset['free'])
+                    # Forzar venta de todas las posiciones
+                    self.executor.execute_trade('SELL', symbol, 'MARKET', real_balance, reason='BUBBLE_QUICK_SELL')
+                    continue
 
                 if not asset_orders:
                     logging.info(f"No se encontraron órdenes para {symbol}.")

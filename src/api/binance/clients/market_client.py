@@ -7,12 +7,44 @@ from config.binance import BINANCE_BASE_URL
 
 logger = setup_logger()
 
+
 class BinanceMarketClient(BaseClient):
     def __init__(self, base_url: str = None):
         """
         Cliente para interactuar con los endpoints públicos del mercado de Binance.
         """
         super().__init__(base_url=base_url or BINANCE_BASE_URL)
+        # Cache para estadísticas de 24h y exchange info
+        self._ticker_24hr_cache: Optional[List[Dict[str, Any]]] = None
+        self._exchange_info_cache: Optional[List[Dict[str, Any]]] = None
+
+    def _get_24hr_data(self, force: bool = False) -> List[Dict[str, Any]]:
+        """
+        Obtiene y cachea globalmente los datos de ticker 24h.
+        """
+        if force or self._ticker_24hr_cache is None:
+            data = self.get("api/v3/ticker/24hr") or []
+            self._ticker_24hr_cache = data
+        return self._ticker_24hr_cache
+
+    def _filter_usdc(self, data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        return [coin for coin in data if coin.get("symbol", "").endswith("USDC")]
+
+    def get_exchange_info(self, force: bool = False) -> List[Dict[str, Any]]:
+        """
+        Obtiene y cachea la información completa de exchangeInfo (pares disponibles).
+        """
+        if force or self._exchange_info_cache is None:
+            info = self.get("api/v3/exchangeInfo") or {}
+            self._exchange_info_cache = info.get("symbols", [])
+        return self._exchange_info_cache
+
+    def get_all_symbols(self) -> List[str]:
+        """
+        Devuelve la lista de todos los símbolos disponibles.
+        """
+        symbols = self.get_exchange_info() or []
+        return [s.get("symbol") for s in symbols if s.get("symbol")]
 
     def check_market_pair(self, pair: str) -> bool:
         """
@@ -46,23 +78,13 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las principales criptomonedas por precio o volumen.
         """
-        endpoint = "api/v3/ticker/24hr"
-        market_data = self.get(endpoint)
-
-        if not market_data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [pair for pair in market_data if pair["symbol"].endswith("USDC")]
-
-        if by == "price":
-            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
-        elif by == "volume":
-            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["quoteVolume"]), reverse=True)
-        else:
-            logger.warning(f"Criterio desconocido: {by}. Usando 'price' por defecto.")
-            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
-
+        market_data = self._get_24hr_data()
+        usdc_pairs = self._filter_usdc(market_data)
+        if by not in ("price", "volume"):
+            logger.warning(f"Criterio desconocido: {by}. Usando 'price'.")
+            by = "price"
+        key = "lastPrice" if by == "price" else "quoteVolume"
+        sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x.get(key, 0)), reverse=True)
         top_cryptos = sorted_pairs[:top_n]
         # logger.info(f"Top {top_n} criptomonedas por {by}: {top_cryptos}")
         return top_cryptos
@@ -72,22 +94,18 @@ class BinanceMarketClient(BaseClient):
         symbol: str,
         start_time: Optional[int] = None,
         end_time: Optional[int] = None,
-        interval: str = "1d"
+        interval: str = "1d",
+        limit: int = 500
     ) -> Optional[List[Any]]:
         """
         Obtiene datos históricos para un símbolo y período específicos.
         """
         endpoint = "api/v3/klines"
-        params = {
-            "symbol": symbol,
-            "interval": interval
-        }
-
-        if start_time:
+        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        if start_time is not None:
             params["startTime"] = start_time
-        if end_time:
+        if end_time is not None:
             params["endTime"] = end_time
-
         data = self.get(endpoint, params=params)
         if data:
             # logger.info(f"Datos históricos obtenidos para {symbol}.")
@@ -100,15 +118,9 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas con mayor incremento de precio en las últimas 24h.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        top_gainers = sorted(usdc_pairs, key=lambda x: float(x['priceChangePercent']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        top_gainers = sorted(pairs, key=lambda x: float(x.get('priceChangePercent', 0)), reverse=True)[:limit]
         # logger.info(f"Top {limit} ganadores: {top_gainers}")
         return top_gainers
 
@@ -116,15 +128,9 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas con mayor decremento de precio en las últimas 24h.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        top_losers = sorted(usdc_pairs, key=lambda x: float(x['priceChangePercent']))[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        top_losers = sorted(pairs, key=lambda x: float(x.get('priceChangePercent', 0)))[:limit]
         # logger.info(f"Top {limit} perdedores: {top_losers}")
         return top_losers
 
@@ -132,15 +138,9 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas más populares en Binance por volumen.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        most_popular = sorted(usdc_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        most_popular = sorted(pairs, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
         # logger.info(f"Criptomonedas más populares: {most_popular}")
         return most_popular
 
@@ -148,16 +148,10 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas con precios intermedios más populares.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        popular_mid_price = [coin for coin in usdc_pairs if 0.5 <= float(coin['lastPrice']) <= 2.5]
-        popular_mid_price_sorted = sorted(popular_mid_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        popular_mid_price = [c for c in pairs if 0.5 <= float(c.get('lastPrice', 0)) <= 2.5]
+        popular_mid_price_sorted = sorted(popular_mid_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio intermedio: {popular_mid_price_sorted}")
         return popular_mid_price_sorted
 
@@ -165,16 +159,10 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas con precios bajos más populares.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        popular_low_price = [coin for coin in usdc_pairs if 0.01 <= float(coin['lastPrice']) <= 0.5]
-        popular_low_price_sorted = sorted(popular_low_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        popular_low_price = [c for c in pairs if 0.01 <= float(c.get('lastPrice', 0)) <= 0.5]
+        popular_low_price_sorted = sorted(popular_low_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio bajo: {popular_low_price_sorted}")
         return popular_low_price_sorted
 
@@ -182,19 +170,13 @@ class BinanceMarketClient(BaseClient):
         """
         Obtiene las criptomonedas con precios muy bajos más populares.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        popular_extra_low_price = [coin for coin in usdc_pairs if 0.00001 <= float(coin['lastPrice']) <= 0.01]
-        popular_extra_low_price_sorted = sorted(popular_extra_low_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        popular_extra_low_price = [c for c in pairs if 0.00001 <= float(c.get('lastPrice', 0)) <= 0.01]
+        popular_extra_low_price_sorted = sorted(popular_extra_low_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio muy bajo: {popular_extra_low_price_sorted}")
         return popular_extra_low_price_sorted
-    
+
     def get_popular_by_price_range(self, min_price: float, max_price: float, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Obtiene las criptomonedas populares dentro de un rango de precios.
@@ -204,19 +186,9 @@ class BinanceMarketClient(BaseClient):
         :param limit: Número máximo de resultados a devolver.
         :return: Lista de criptomonedas populares dentro del rango de precios.
         """
-        endpoint = "api/v3/ticker/24hr"
-        data = self.get(endpoint)
-
-        if not data:
-            logger.debug("No se pudo obtener información del mercado.")
-            return []
-
-        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
-        filtered_pairs = [
-            coin for coin in usdc_pairs 
-            if min_price <= float(coin['lastPrice']) <= max_price
-        ]
-        sorted_pairs = sorted(filtered_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        data = self._get_24hr_data()
+        pairs = self._filter_usdc(data)
+        filtered_pairs = [c for c in pairs if min_price <= float(c.get('lastPrice', 0)) <= max_price]
+        sorted_pairs = sorted(filtered_pairs, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
         logger.debug(f"Criptomonedas populares en rango {min_price}-{max_price}: {sorted_pairs}")
         return sorted_pairs
-

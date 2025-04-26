@@ -15,6 +15,8 @@ from app.services.investment_calculator import InvestmentCalculator
 from app.analyzers.sentiment_analyzer import SentimentAnalyzer
 from config.settings import settings
 from config.default import BUY_CATEGORIES, INTERVAL_MAP
+from app.utils.bubble_registry import register as bubble_register
+from app.managers.risk_manager import RiskManager
 
 logging = setup_logger()
 
@@ -46,6 +48,8 @@ class BuyManager(BuyUseCase):
         self.thread_pool = ThreadPoolExecutor(max_workers=max_workers)
         # Símbolos sin histórico válido para excluir de futuros análisis
         self.failed_symbols: Set[str] = set()
+        # Risk management
+        self.risk_manager = RiskManager(data_provider, executor)
 
     def calculate_interval_in_milliseconds(self, interval: str) -> int:
         """
@@ -126,7 +130,8 @@ class BuyManager(BuyUseCase):
             # Obtener indicadores técnicos
             sma_condition, rsi_condition, macd_condition, bb_condition, adx_condition, stochastic_condition = analyzer.get_signals()
 
-            return symbol, {
+            # Construir análisis inicial
+            analysis = {
                 'trend': trend,
                 'indicators': {
                     'sma': sma_condition,
@@ -135,8 +140,37 @@ class BuyManager(BuyUseCase):
                     'bb': bb_condition,
                     'adx': adx_condition,
                     'stochastic': stochastic_condition
-                }
+                },
+                'bubble_override': analyzer.bubble_override,
+                'sell_price_invalid': getattr(analyzer, 'sell_price_invalid', False),
+                'sell_price_override': False
             }
+            # Si precio de venta inválido y no override de burbuja, intentar con rango doble
+            if analysis['sell_price_invalid'] and not analysis['bubble_override']:
+                ext_hours = settings.DEFAULT_HISTORICAL_RANGE_HOURS * settings.DEFAULT_EXT_HISTORICAL_MULTIPLIER
+                ext_days = ext_hours / 24
+                now = datetime.now(timezone.utc)
+                ext_start = int((now - timedelta(hours=ext_hours)).timestamp() * 1000)
+                logging.info(
+                    f"{symbol}: precio objetivo inválido, probando rango extendido: {ext_days:.0f}d ({ext_hours}h) x{settings.DEFAULT_EXT_HISTORICAL_MULTIPLIER}"
+                )
+                data_ext = self.fetch_all_data(symbol, ext_start, end_time)
+                try:
+                    analyzer2 = MarketAnalyzer(data_ext, symbol)
+                    sell_price2 = analyzer2.calculate_sell_price(analyzer2._latest())
+                    valid2 = analyzer2.is_sell_price_valid(sell_price2)
+                    if valid2:
+                        analysis['sell_price_override'] = True
+                        logging.info(
+                            f"{symbol}: override de precio válido tras extensión: objetivo {sell_price2:.6f} <= max ajustado"
+                        )
+                    else:
+                        logging.info(
+                            f"{symbol}: sigue inválido tras extensión: objetivo {sell_price2:.6f} > max ajustado"
+                        )
+                except Exception as e:
+                    logging.error(f"Error reanalizando {symbol} con rango ext: {e}")
+            return symbol, analysis
         except Exception as e:
             logging.error(f"Error procesando {symbol}: {e}")
             return symbol, None
@@ -154,13 +188,17 @@ class BuyManager(BuyUseCase):
         coins_to_process = []
         for cfg in BUY_CATEGORIES:
             method = getattr(self.data_provider, cfg['method'])
+            logging.info(f"Procesando {cfg['name']}...")
             if 'min_price' in cfg and 'max_price' in cfg:
-                coins = method(cfg['min_price'], cfg['max_price'], cfg.get('limit', 10))
+                coins = method(cfg['min_price'], cfg['max_price'], cfg.get('limit', 50))
             else:
-                coins = method(cfg.get('limit', 10))
-        
+                coins = method(cfg.get('limit', 50))
+            # Si se obtienen menos monedas que el límite, rellenar con las más populares
+            limit = cfg.get('limit', 50)
+            if len(coins) < limit:
+                logging.warning(f"Solo se obtuvieron {len(coins)} de {limit} para {cfg['name']}, rellenando con más populares")
+                
             coins_to_process.extend(coins)
-
         # Excluir símbolos con datos históricos fallidos previos
         if self.failed_symbols:
             original = len(coins_to_process)
@@ -198,8 +236,22 @@ class BuyManager(BuyUseCase):
                 logging.info(f"Cantidad a comprar 0 para {symbol} con allocation {allocation:.2f} USDC")
                 continue
             indicators = analysis.get('indicators', {})
-            if self.decision_engine.should_buy(symbol, current_price, quantity, indicators):
+            should = self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
+            # Permitir compra si override de burbuja o precio override
+            if analysis.get('bubble_override') or analysis.get('sell_price_override') or should:
+                # Verificar límites de exposición
+                if not self.risk_manager.can_open_position(current_price, quantity):
+                    logging.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
+                    continue
+                # Ejecutar compra
                 self._make_action(symbol, current_price, quantity)
+                # Programar stop-loss/take-profit automáticos
+                stop_pct = settings.STOP_LOSS_MARGIN / 100
+                take_pct = settings.PROFIT_MARGIN / 100
+                self.risk_manager.apply_stop_take(symbol, current_price, stop_pct, take_pct)
+                # Registrar compra rápida si override de burbuja
+                if analysis.get('bubble_override'):
+                    bubble_register(symbol)
                 # Esperar un poco para no saturar la API ni la cuenta
                 time.sleep(5)
 

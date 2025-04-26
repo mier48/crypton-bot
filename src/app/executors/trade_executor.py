@@ -53,17 +53,35 @@ class TradeExecutor:
             if decimals is None:
                 raise ValueError(f"No se pudo determinar los decimales permitidos para el símbolo {symbol}")
 
+            # Ajustar posición para SELL MARKET según balance disponible
+            if side == "SELL" and order_type.upper() == "MARKET":
+                balances = self.data_manager.get_balance_summary()
+                base_asset = symbol.replace("USDC", "")
+                free_qty = next((b['free'] for b in balances if b['asset'] == base_asset), 0.0)
+                if free_qty <= 0:
+                    logger.error(f"No hay balance disponible de {base_asset} para vender.")
+                    return False
+                positions = min(positions, free_qty)
+
             # Formatear cantidad
             quantity = self._format_quantity(positions, decimals)
 
-            # Crear orden
-            order = self.data_manager.create_order(
-                symbol=symbol,
-                side=side,
-                type_=order_type,
-                quantity=quantity,
-                price=price
-            )
+            # Crear orden: para MARKET BUY usar quoteOrderQty (spend amount), para otros usar quantity
+            if order_type.upper() == "MARKET" and side == "BUY":
+                order = self.data_manager.create_order(
+                    symbol=symbol,
+                    side=side,
+                    type_=order_type,
+                    quote_order_qty=quantity
+                )
+            else:
+                order = self.data_manager.create_order(
+                    symbol=symbol,
+                    side=side,
+                    type_=order_type,
+                    quantity=quantity,
+                    price=price
+                )
             if not order:
                 logger.error("La orden no se pudo ejecutar.")
                 return False

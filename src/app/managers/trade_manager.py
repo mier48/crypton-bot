@@ -17,6 +17,7 @@ from app.services.buy_decision_engine import BuyDecisionEngine
 from app.services.price_calculator import PriceCalculator
 from app.services.sell_decision_engine import SellDecisionEngine
 from app.services.investment_calculator import InvestmentCalculator
+from app.strategies.loader import load_strategies  # Import plugin loader
 
 from config.default import (
     DEFAULT_PROFIT_MARGIN,
@@ -106,6 +107,8 @@ class TradeManager:
             stop_loss_margin=self.stop_loss_margin,
             min_trade_usd=settings.MIN_TRADE_USD
         )
+        # Cargar estrategias de plugins
+        self.strategies = load_strategies(self.data_manager, settings)
 
     def run(self) -> None:
         """
@@ -125,6 +128,27 @@ class TradeManager:
                     self.buy_manager.analyze_and_execute_buys()
                 except Exception as e:
                     logging.error(f"Error en análisis de compra: {e}")
+                # # Ejecutar estrategias pluginizadas
+                # for strat in self.strategies:
+                #     try:
+                #         signals = strat.analyze()
+                #         symbol = signals.get('symbol')
+                #         size = signals.get('size', self.investment_amount)
+                #         order_type = signals.get('order_type', 'MARKET')
+                #         # Señal de compra
+                #         if signals.get('buy') and symbol:
+                #             self.executor.execute_trade(
+                #                 'BUY', symbol, order_type, size,
+                #                 reason=f"{strat.name()} buy"
+                #             )
+                #         # Señal de venta
+                #         if signals.get('sell') and symbol:
+                #             self.executor.execute_trade(
+                #                 'SELL', symbol, order_type, size,
+                #                 reason=f"{strat.name()} sell"
+                #             )
+                #     except Exception as e:
+                #         logging.error(f"Error en estrategia {strat.name()}: {e}")
                 time.sleep(self.sleep_interval)
         except KeyboardInterrupt:
             self.stop()

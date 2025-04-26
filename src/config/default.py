@@ -1,19 +1,24 @@
 from typing import Dict
 
-DEFAULT_PROFIT_MARGIN = 1.5 # 3% profit margin
+DEFAULT_PROFIT_MARGIN = 3 # 3% profit margin
 DEFAULT_SLEEP_INTERVAL = 90 # 90 seconds wait interval
-DEFAULT_INVESTMENT_AMOUNT = 25 # $25 investment per trade
+DEFAULT_INVESTMENT_AMOUNT = 15 # $25 investment per trade
 DEFAULT_MAX_BUY_PRICE = 5 # $5 maximum unit purchase price
 DEFAULT_LOT_SIZE_FILTER = "LOT_SIZE" # Lot size filter
 DEFAULT_VALIDATION_MIN_SCORE = 5 # Minimum validation score
 DEFAULT_STOP_LOSS_MARGIN = 15 # 25% stop loss margin
-DEFAULT_CHECK_PRICE_INTERVAL = "5m" # 5-minute price interval for Binance API
-DEFAULT_HISTORICAL_RANGE_HOURS = 5 * 24 # 7-day historical price range for Binance API
+DEFAULT_CHECK_PRICE_INTERVAL = "1m" # 1-minute price interval for scalping rápido
+DEFAULT_HISTORICAL_RANGE_HOURS = 2  # 2-hour histórico ajustado para trading rápido
+DEFAULT_EXT_HISTORICAL_MULTIPLIER = 2  # Multiplier for extended historical range during sell_price validation
 DEFAULT_USE_OPEN_AI_API = False # Do not use OpenAI API by default
+DEFAULT_MAX_EXPOSURE_PERCENT = 50  # Porcentaje máximo de exposición total (0-100)
+DEFAULT_RISK_PER_TRADE_PERCENT = 2  # Porcentaje de capital arriesgado por operación (0-100)
 
 # Bubble detection
 BUBBLE_DETECT_WINDOW = 12  # Número de velas para medir crecimiento (ej. últimas 12 barras de 5m = 1h)
 BUBBLE_MAX_GROWTH = 0.05  # Crecimiento máximo permitido en la ventana (5%)
+BUBBLE_MOMENTUM_WINDOW = 24  # Número de velas para momentum (ej. 2h a 5m = 24 barras)
+BUBBLE_MOMENTUM_THRESHOLD = 0.5  # 50% de velas alcistas para override de burbuja
 
 INTERVAL_MAP: Dict[str, int] = {
     # Seconds
@@ -52,47 +57,58 @@ BUY_CATEGORIES = [
         "limit": 50
     },
     {
-        "name": "Top 20 Most Popular (price between $2.5 and $5)",
+        "name": "Top 20 Losers",
+        "method": "get_top_losers",
+        "limit": 20
+    },
+    {
+        "name": "Top 10 Most Popular",
+        "method": "get_most_popular",
+        "limit": 10
+    },
+    {
+        "name": "Top 10 Popular Mid Price",
+        "method": "get_popular_mid_price",
+        "limit": 10
+    },
+    {
+        "name": "Top 10 Popular Low Price",
+        "method": "get_popular_low_price",
+        "limit": 10
+    },
+    {
+        "name": "Top 10 Popular Extra Low Price",
+        "method": "get_popular_extra_low_price",
+        "limit": 10
+    },
+    {
+        "name": "Popular Price Range $2.5 - $5",
         "method": "get_popular_by_price_range",
-        "limit": 20,
+        "limit": 50,
         "min_price": 2.5,
-        "max_price": 5,
+        "max_price": 5
     },
     {
-        "name": "Top 20 Most Popular (price between $1 and $2.5)",
+        "name": "Popular Price Range $1 - $2.5",
+        "method": "get_popular_by_price_range",
+        "limit": 50,
+        "min_price": 1,
+        "max_price": 2.5
+    },
+    {
+        "name": "Popular Price Range $0.5 - $1.0",
+        "method": "get_popular_by_price_range",
+        "limit": 50,
+        "min_price": 0.5,
+        "max_price": 1.0
+    },
+    {
+        "name": "Popular Price Range $0.01 - $0.1",
         "method": "get_popular_by_price_range",
         "limit": 20,
-        "min_price": 1,
-        "max_price": 2.5,
-    },
-    {
-        "name": "Top 10 Most Popular (price between $0.5 and $1.0)",
-        "method": "get_popular_by_price_range",
-        "limit": 10,
-        "min_price": 0.5,
-        "max_price": 1.0,
-    },
-    # {
-    #     "name": "Top 20 Most Popular (price between $0.01 and $0.1)",
-    #     "method": "get_popular_by_price_range",
-    #     "limit": 20,
-    #     "min_price": 0.01,
-    #     "max_price": 0.1,
-    # },
-    # {
-    #     "name": "Top 20 Most Popular (price between $0.001 and $0.01)",
-    #     "method": "get_popular_by_price_range",
-    #     "limit": 20,
-    #     "min_price": 0.001,
-    #     "max_price": 0.01,
-    # },
-    # {
-    #     "name": "Top 20 Most Popular (price between $0.0001 and $0.001)",
-    #     "method": "get_popular_by_price_range",
-    #     "limit": 20,
-    #     "min_price": 0.0001,
-    #     "max_price": 0.001,
-    # },
+        "min_price": 0.01,
+        "max_price": 0.1
+    }
 ]
 
 # Parámetros para MarketAnalyzer (antes hardcodeados en la clase)

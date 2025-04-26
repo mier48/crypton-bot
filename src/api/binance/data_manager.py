@@ -31,12 +31,14 @@ class BinanceDataManager:
         symbol: str,
         start_time: Optional[int] = None,
         end_time: Optional[int] = None,
-        interval: str = "1d"
+        interval: str = "1d",
+        limit: int = 500
     ) -> Optional[List[Any]]:
         """
         Obtiene datos históricos para un símbolo y período específicos.
         """
-        return self.market_client.fetch_historical_data(symbol, start_time, end_time, interval)
+        # Utiliza limit para paginar hasta 1000 según necesidad
+        return self.market_client.fetch_historical_data(symbol, start_time, end_time, interval, limit)
 
     def get_top_gainers(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
@@ -91,6 +93,18 @@ class BinanceDataManager:
         Obtiene las criptomonedas más populares entre un rango de precios.
         """
         return self.market_client.get_popular_by_price_range(min_price, max_price, limit)
+
+    def get_exchange_info(self, force: bool = False) -> List[Dict[str, Any]]:
+        """
+        Obtiene metadatos de exchangeInfo (pares listados) con cache.
+        """
+        return self.market_client.get_exchange_info(force)
+
+    def get_all_symbols(self) -> List[str]:
+        """
+        Devuelve lista de todos los símbolos disponibles en Binance.
+        """
+        return self.market_client.get_all_symbols()
 
     ## Operaciones de Cuenta y Trading
     def get_balance_summary(self) -> List[Dict[str, Any]]:

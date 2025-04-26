@@ -1,5 +1,5 @@
 from pydantic import BaseSettings, Field
-from config.default import DEFAULT_CHECK_PRICE_INTERVAL, DEFAULT_HISTORICAL_RANGE_HOURS
+from config.default import DEFAULT_CHECK_PRICE_INTERVAL, DEFAULT_HISTORICAL_RANGE_HOURS, DEFAULT_EXT_HISTORICAL_MULTIPLIER, DEFAULT_MAX_EXPOSURE_PERCENT, DEFAULT_RISK_PER_TRADE_PERCENT
 from datetime import datetime, timezone
 from typing import Dict, Any
 
@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Interval settings
     DEFAULT_CHECK_PRICE_INTERVAL: str = Field(DEFAULT_CHECK_PRICE_INTERVAL, env="DEFAULT_CHECK_PRICE_INTERVAL")
     DEFAULT_HISTORICAL_RANGE_HOURS: int = Field(DEFAULT_HISTORICAL_RANGE_HOURS, env="DEFAULT_HISTORICAL_RANGE_HOURS")
+    DEFAULT_EXT_HISTORICAL_MULTIPLIER: int = Field(DEFAULT_EXT_HISTORICAL_MULTIPLIER, env="DEFAULT_EXT_HISTORICAL_MULTIPLIER")
     OPTUNA_PARAM_SPACE: Dict[str, Any] = Field(
         { 'sma_period': (5, 50), 'rsi_threshold': (20, 80) }, env=None
     )
@@ -25,6 +26,9 @@ class Settings(BaseSettings):
     BACKTEST_START: datetime = Field(datetime(2025, 1, 1, tzinfo=timezone.utc), env=None)
     BACKTEST_END: datetime   = Field(datetime(2025, 4, 1, tzinfo=timezone.utc), env=None)
     OVERFITTING_THRESHOLD: float = Field(0.1, env="OVERFITTING_THRESHOLD")
+    # Risk limits
+    MAX_EXPOSURE_PERCENT: float = Field(DEFAULT_MAX_EXPOSURE_PERCENT, env="MAX_EXPOSURE_PERCENT")
+    RISK_PER_TRADE_PERCENT: float = Field(DEFAULT_RISK_PER_TRADE_PERCENT, env="RISK_PER_TRADE_PERCENT")
     ANOMALY_CONTAMINATION: float = Field(0.01, env="ANOMALY_CONTAMINATION")
 
     class Config:

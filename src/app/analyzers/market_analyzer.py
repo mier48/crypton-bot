@@ -7,7 +7,8 @@ from config.default import (
     BUY_THRESHOLD_SMA, BUY_THRESHOLD_RSI, BUY_THRESHOLD_MACD,
     BUY_THRESHOLD_BB, BUY_THRESHOLD_ADX, BUY_THRESHOLD_STOCHASTIC,
     DEFAULT_VALIDATION_MIN_SCORE as MIN_SCORE,
-    BUBBLE_DETECT_WINDOW, BUBBLE_MAX_GROWTH
+    BUBBLE_DETECT_WINDOW, BUBBLE_MAX_GROWTH,
+    BUBBLE_MOMENTUM_WINDOW, BUBBLE_MOMENTUM_THRESHOLD
 )
 from utils.logger import setup_logger
 
@@ -36,7 +37,10 @@ class MarketAnalyzer:
         self.low = pd.Series([float(kline[3]) for kline in data])
         self.symbol = symbol
         
+        # Registrar precio de apertura para momentum
+        self.open_prices = pd.Series([float(kline[1]) for kline in data])
         self.df = pd.DataFrame({
+            'open': self.open_prices,
             'close': self.close_prices,
             'volume': self.volume,
             'high': self.high,
@@ -44,6 +48,11 @@ class MarketAnalyzer:
             'timestamp': self.timestamps
         })
         self.df.set_index('timestamp', inplace=True)
+        # Flag para override de burbuja
+        self.bubble_override = False
+        self.bubble_detected = False
+        # Flag para validación de precio de venta
+        self.sell_price_invalid = False
         self._prepare_indicators()
 
     def _prepare_indicators(self):
@@ -160,7 +169,7 @@ class MarketAnalyzer:
         """
         historical_max = self.df['close'].max()
         adjusted_max = historical_max * safety_margin
-        logger.debug(f"Máximo histórico: {historical_max}, Máximo ajustado: {adjusted_max}, Precio de venta necesario: {sell_price}")
+        logger.info(f"Máximo histórico: {historical_max:.6f}, Máximo ajustado: {adjusted_max:.6f}, Precio de venta necesario: {sell_price:.6f}")
         return sell_price <= adjusted_max
 
     def is_buy_signal(self):
@@ -170,13 +179,27 @@ class MarketAnalyzer:
         :return: True si es una señal de compra válida, de lo contrario, False.
         """
         latest = self._latest()
-        # Detección de burbuja: evitar compras tras subidas excesivas
+        # Detección de burbuja con posible override por momentum
+        self.bubble_override = False
         if len(self.df) >= BUBBLE_DETECT_WINDOW:
             prev_price = self.df['close'].iloc[-BUBBLE_DETECT_WINDOW]
             growth = (latest['close'] - prev_price) / prev_price
             if growth > BUBBLE_MAX_GROWTH:
-                logger.warning(f"[{self.symbol}] Descarta señal: posible burbuja (crecimiento {growth:.2%} en últimas {BUBBLE_DETECT_WINDOW} velas).")
-                return False
+                self.bubble_detected = True
+                logger.warning(f"[{self.symbol}] Potencial burbuja (crecimiento {growth:.2%} en últimas {BUBBLE_DETECT_WINDOW} velas).")
+                # Comprobar momentum override
+                if len(self.df) >= BUBBLE_MOMENTUM_WINDOW:
+                    recent = self.df.iloc[-BUBBLE_MOMENTUM_WINDOW:]
+                    up_frac = (recent['close'] > recent['open']).mean()
+                    if up_frac >= BUBBLE_MOMENTUM_THRESHOLD:
+                        logger.info(f"[{self.symbol}] Override burbuja por momentum: {up_frac:.2%} velas alcistas.")
+                        self.bubble_override = True
+                    else:
+                        logger.warning(f"[{self.symbol}] No hay suficientes velas alcistas para override de burbuja: {up_frac:.2%} velas alcistas. Minimo {BUBBLE_MOMENTUM_THRESHOLD:.2%} velas alcistas.")
+                        return False
+                else:
+                    logger.warning(f"[{self.symbol}] El {len(self.df)} es menor que {BUBBLE_MOMENTUM_WINDOW}")
+                    return False
 
         score = 0
 
@@ -221,10 +244,12 @@ class MarketAnalyzer:
                 logger.info("Señal de compra válida detectada.")
                 return True
             else:
-                logger.info(f"[{self.symbol}] Señal de compra descartada: El precio de venta necesario excede el máximo histórico ajustado.")
+                # Marcar y descartar señal temporalmente
+                self.sell_price_invalid = True
+                logger.info(f"[{self.symbol}] Señal de compra descartada: El precio de venta necesario (${sell_price:.6f}) excede el máximo histórico ajustado.")
                 return False
-        else:
-            return False
+        # No se cumplió el umbral de indicadores
+        return False
 
     def analyze(self):
         """

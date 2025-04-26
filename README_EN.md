@@ -1,6 +1,6 @@
 # Crypton Bot 🚀🤖
 
-[![Version: 2.1.1](https://img.shields.io/badge/Version-2.1.1-blue.svg)](./README_EN.md)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![Version: 2.2.0](https://img.shields.io/badge/Version-2.2.0-blue.svg)](./README_EN.md)  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 **Crypton Bot** is a fully automated cryptocurrency trading bot combining technical analysis, machine learning, and AI to optimize buy and sell decisions.
 

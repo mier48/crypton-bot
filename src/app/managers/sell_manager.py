@@ -2,39 +2,41 @@ import time
 from typing import List, Dict, Any
 from prettytable import PrettyTable
 
-from api.binance.data_manager import BinanceDataManager
-from api.openai.client import OpenAIClient
-from api.coingecko.client import CoinGeckoClient
+from domain.ports import TradeDataProvider, TradeExecutorPort, SellUseCase
 from app.analyzers.sentiment_analyzer import SentimentAnalyzer
-from app.executors.trade_executor import TradeExecutor
 from utils.logger import setup_logger
+from app.services.price_calculator import PriceCalculator
+from app.services.sell_decision_engine import SellDecisionEngine
+from config.settings import settings
 
 logging = setup_logger()
 
-class SellManager:
+class SellManager(SellUseCase):
     """
     Gestor encargado de analizar y ejecutar ventas de criptomonedas.
     """
 
     def __init__(
         self,
-        data_manager: BinanceDataManager,
-        executor: TradeExecutor,
+        data_provider: TradeDataProvider,
+        executor: TradeExecutorPort,
         sentiment_analyzer: SentimentAnalyzer,
-        coin_gecko_client: CoinGeckoClient,
-        openai_client: OpenAIClient,
-        profit_margin: float,
-        stop_loss_margin: float,
-        use_open_ai_api: bool
+        price_calculator: PriceCalculator,
+        decision_engine: SellDecisionEngine,
+        profit_margin: float = settings.PROFIT_MARGIN,
+        stop_loss_margin: float = settings.STOP_LOSS_MARGIN,
+        min_trade_usd: float = settings.MIN_TRADE_USD
     ):
-        self.data_manager = data_manager
+        self.data_provider = data_provider
         self.executor = executor
         self.sentiment_analyzer = sentiment_analyzer
-        self.coin_gecko_client = coin_gecko_client
-        self.openai_client = openai_client
+        self.price_calculator = price_calculator
+        self.decision_engine = decision_engine
         self.profit_margin = profit_margin
         self.stop_loss_margin = stop_loss_margin
-        self.use_open_ai_api = use_open_ai_api
+        self.min_trade_usd = min_trade_usd
+        # Estado para trailing stop: máximo precio alcanzado por símbolo
+        self.trailing_highs: Dict[str, float] = {}
 
     def show_portfolio(self, balances: List[Dict[str, Any]]) -> None:
         """
@@ -77,17 +79,6 @@ class SellManager:
         :param real_balance: Saldo real después de compras y ventas.
         :return: Precio promedio de compra.
         """
-        # total_bought = sum(float(order['executedQty']) for order in buy_orders)
-        # total_sold = sum(float(order['executedQty']) for order in sell_orders)
-        # net_balance = total_bought - total_sold
-
-        # if net_balance <= 0:
-        #     logging.debug("No hay balance neto para calcular el precio promedio de compra.")
-        #     return 0.0
-
-        # total_spent = sum(float(order['price']) * float(order['executedQty']) for order in buy_orders)
-        # average_buy_price = total_spent / net_balance if net_balance > 0 else 0.0
-        # return average_buy_price
         total_bought = sum(float(order['executedQty']) for order in buy_orders)
         total_sold = sum(float(order['executedQty']) for order in sell_orders)
         real_balance = total_bought - total_sold
@@ -116,24 +107,24 @@ class SellManager:
         """
         Analiza la cartera para determinar si es un buen momento para vender criptomonedas y ejecuta las ventas.
         """
-        balances = self.data_manager.get_balance_summary()
-        usdt_balance = float(next((item['free'] for item in balances if item['asset'] == 'USDT'), 0.0))
-        assets = [balance for balance in balances if balance['asset'] != 'USDT' and float(balance['free']) > 1]
+        balances = self.data_provider.get_balance_summary()
+        usdc_balance = float(next((item['free'] for item in balances if item['asset'] == 'USDC'), 0.0))
+        assets = [balance for balance in balances if balance['asset'] != 'USDC' and float(balance['free']) > 1]
         sorted_assets = sorted(assets, key=lambda x: float(x['free']), reverse=True)
 
         self.show_portfolio(sorted_assets)
 
         for asset in sorted_assets:
             try:
-                symbol = f"{asset['asset']}USDT"
-                asset_orders = self.data_manager.get_all_orders(symbol)
+                symbol = f"{asset['asset']}USDC"
+                asset_orders = self.data_provider.get_all_orders(symbol)
 
                 if not asset_orders:
                     logging.info(f"No se encontraron órdenes para {symbol}.")
                     continue
 
-                buy_orders = [order for order in asset_orders if order['side'] == 'BUY']
-                sell_orders = [order for order in asset_orders if order['side'] == 'SELL']
+                buy_orders = [o for o in asset_orders if o['side'] == 'BUY']
+                sell_orders = [o for o in asset_orders if o['side'] == 'SELL']
                 real_balance = float(asset['free'])
 
                 if real_balance <= 0:
@@ -152,10 +143,13 @@ class SellManager:
                     quantity=real_balance,
                     profit_margin=self.profit_margin
                 )
-                current_price = self.data_manager.get_price(symbol)
+                current_price = self.data_provider.get_price(symbol)
 
-                # Calcular el precio de stop loss
-                stop_loss_price = average_buy_price * (1 - (self.stop_loss_margin / 100))
+                # Actualizar máximo histórico intra-trade para trailing stop
+                prev_high = self.trailing_highs.get(symbol, average_buy_price)
+                self.trailing_highs[symbol] = max(prev_high, current_price)
+                trailing_stop_price = self.trailing_highs[symbol] * (1 - (self.stop_loss_margin / 100))
+                stop_loss_price = trailing_stop_price
 
                 # Calcular porcentaje de ganancia o pérdida
                 percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100
@@ -164,29 +158,23 @@ class SellManager:
                 logging.info(f"Asset: {asset['asset']}")
                 logging.info(f"Precio Actual: ${current_price:,.8f}")
                 logging.info(f"Posiciones abiertas: {real_balance:,.2f}")
+                logging.info(f"Precio máximo alcanzado: {self.trailing_highs[symbol]:.8f}")
                 logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.8f}")
                 logging.info(f"Precio Objetivo de Venta: ${target_price:,.8f}")
                 logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.8f}")
-                logging.info(f"Porcentaje de Ganancia: {percentage_gain:.2f}%")
+                logging.info(f"Porcentaje de Ganancia: {percentage_gain:.2f}%\n")
                 # logging.info(f"Porcentaje de Pérdida: {percentage_loss:.2f}%")
 
-                # Verificar si se alcanza el stop loss
-                if current_price <= stop_loss_price or current_price >= target_price:
-                    if current_price * real_balance < 5: # Verificar si el monto total es menor a $5.00. $5.00 es el mínimo permitido en Binance.
-                        logging.info(f"No se puede vender {asset['asset']} por menos de $5.00. Actualmente tienes: ${current_price*real_balance}.\n")
-                        continue
-
-                    if self.use_open_ai_api:
-                        logging.info(f"Enviando prompt a OpenAI para {symbol}...")
-                        self._use_open_ai_api(asset, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-                    else:
-                        logging.info("No se enviará el prompt a OpenAI debido a la configuración actual.")
-                        if current_price <= stop_loss_price:
-                            self._make_action("vender pérdida", symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-                        elif current_price >= target_price:
-                            self._make_action("vender ganancia", symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-                else:
-                    logging.info("No hacer nada, estas fuera del stop loss y del margen de ganacia.\n")
+                if current_price * real_balance < self.min_trade_usd:
+                    logging.info(f"Operación menor a mínimo {self.min_trade_usd} USD, omitiendo.")
+                    continue
+                decision = self.decision_engine.decide(asset, average_buy_price, current_price, real_balance)
+                # Evitar ventas por target si la ganancia neta es inferior al umbral configurado
+                if decision == "vender ganancia" and percentage_gain < self.profit_margin:
+                    logging.info(f"[{symbol}] Ganancia {percentage_gain:.2f}% menor al objetivo {self.profit_margin}%, omitiendo venta para cubrir comisiones.")
+                    continue
+                if decision != "mantener":
+                    self._make_action(decision, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
 
                 # Opcional: espera entre cada operación para evitar sobrecargar la API
                 time.sleep(2)
@@ -194,54 +182,6 @@ class SellManager:
             except Exception as e:
                 logging.error(f"Error al procesar la venta para {symbol}: {e}")
     
-    def _use_open_ai_api(self, asset, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss):
-        # Obtener sentimiento y noticias relevantes
-        sentiment = self.sentiment_analyzer.get_overall_sentiment(asset['asset'])
-        news_info = self.coin_gecko_client.fetch_crypto_news(asset['asset'])
-
-        logging.info(f"El sentimiento general para {asset['asset']} es {sentiment:.2f} (1 positivo, 0 neutro, -1 negativo).")
-
-        # Crear el prompt para OpenAI
-        prompt = (
-            "Eres un experto en trading y análisis de criptomonedas. Quieres tomar la mejor decisión para tu inversión.\n\n"
-            "### Contexto\n"
-            "Tienes una posición abierta en el mercado de criptomonedas y el precio ha cambiado.\n\n"
-            "### Datos Actuales\n"
-            f"- Activo: {symbol}\n"
-            f"- Precio de compra promedio: ${average_buy_price:,.6f}\n"
-            f"- Precio actual: ${current_price:,.6f}\n"
-            f"- Cantidad: {real_balance:,.6f}\n"
-            f"- Porcentaje de ganancia: {percentage_gain:.2f}%\n"
-            f"- Porcentaje de pérdida: {percentage_loss:.2f}%\n"
-            f"- Mi margen de stop loss es de: {self.stop_loss_margin}%\n"
-            "### Sentimiento del Mercado\n"
-            f"El sentimiento general para {asset['asset']} es {sentiment:.2f} (1 positivo, 0 neutro, -1 negativo).\n\n"
-            "### Noticias Relevantes\n"
-            f"{news_info}\n\n"
-            "### Pregunta\n"
-            "¿Recomiendas vender ahora para aprovechar las ganancias, vender para limitar pérdidas o mantener la posición si consideras que puede volver a subir de precio? "
-            "Tienes que responder solamente 'Vender Ganancia', 'Vender Pérdida' o 'Mantener'. Muy importante, solo responde una de las 3 opciones anteriores.\n\n"
-            "Tu recomendación debe basarse en un análisis riguroso de los datos proporcionados y las condiciones del mercado."
-        )
-
-        # Consultar a OpenAI
-        response = self.openai_client.send_prompt(prompt)
-        
-        if response:
-            logging.info(f"Respuesta de openAI para {symbol}: {response}")
-
-            response_lower = response.lower()
-            if "vender ganancia" in response_lower:
-                self._make_action("vender ganancia", symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-            elif "vender pérdida" in response_lower:
-                self._make_action("vender pérdida", symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-            elif "mantener" in response_lower:
-                logging.info(f"Decisión de mantener la posición según recomendación de OpenAI para {symbol}.\n")
-            else:
-                logging.warning(f"Respuesta no reconocida de OpenAI para {symbol}: {response}.\n")
-        else:
-            logging.warning(f"No se recibió respuesta de OpenAI. Manteniendo la posición por defecto para {symbol}.\n")
-
     def _make_action(self, action, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss):
         if action == "vender pérdida":
             percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
@@ -280,4 +220,3 @@ class SellManager:
                     logging.error(f"Orden de venta por objetivo de ganancia no se ha podido ejecutar para {symbol}.\n")
             except Exception as e:
                 logging.error(f"Error al ejecutar la venta por objetivo de ganancia para {symbol}: {e}")
-

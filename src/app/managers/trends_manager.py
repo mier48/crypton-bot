@@ -1,24 +1,23 @@
 from typing import List, Dict, Any
-from api.news.newsapi.client import NewsAPIClient
-from api.news.reddit.client import RedditClient
 from utils.logger import setup_logger
+from domain.ports import TrendsUseCase, NewsProvider, SocialMediaProvider
 
 logger = setup_logger(__name__)
 
-class TrendsManager:
+class TrendsManager(TrendsUseCase):
     """
     Gestiona la recuperación y combinación de tendencias desde múltiples fuentes.
     """
     
-    def __init__(self, news_client: NewsAPIClient = None, reddit_client: RedditClient = None):
+    def __init__(self, news_client: NewsProvider, reddit_client: SocialMediaProvider):
         """
         Inicializa el gestor de tendencias con clientes para las fuentes.
 
-        :param news_client: Instancia de NewsAPIClient. Si no se proporciona, se crea una nueva.
-        :param reddit_client: Instancia de RedditClient. Si no se proporciona, se crea una nueva.
+        :param news_client: Instancia de NewsProvider.
+        :param reddit_client: Instancia de SocialMediaProvider.
         """
-        self.news_client = news_client or NewsAPIClient()
-        self.reddit_client = reddit_client or RedditClient()
+        self.news_client = news_client
+        self.reddit_client = reddit_client
 
     def fetch_trends(self, keyword: str, limit: int = 100) -> List[Dict[str, Any]]:
         """

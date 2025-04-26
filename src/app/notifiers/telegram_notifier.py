@@ -53,7 +53,7 @@ class TelegramNotifier:
         Sends a specific buy or sell notification.
 
         :param side: "BUY" or "SELL".
-        :param symbol: Asset symbol (e.g., BTCUSDT).
+        :param symbol: Asset symbol (e.g., BTCUSDC).
         :param quantity: Traded quantity.
         :param price: Trade price.
         :param initial_balance: Available balance after trade.

@@ -24,7 +24,7 @@ class PreTradeAnalyzer:
         "market sentiment", "bull run", "bear market", "bitcoin halving",
         "crypto fear and greed", "inflation", "recession", "regulation"
     ]
-    SYMBOLS = ["BTCUSDT", "ETHUSDT", "XRPUSDT", "ADAUSDT", "SOLUSDT"]
+    SYMBOLS = ["BTCUSDC", "ETHUSDC", "XRPUSDC", "ADAUSDC", "SOLUSDC"]
     SENTIMENT_ANALYSIS_COUNT = 10
 
     def __init__(self):

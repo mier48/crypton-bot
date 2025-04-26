@@ -136,7 +136,7 @@ class BinanceAccountClient(BaseClient):
             logger.error("Error al obtener tarifas de trading.")
             return None
 
-    def get_trade_fee_rate(self, symbol: str = "BTCUSDT") -> Optional[float]:
+    def get_trade_fee_rate(self, symbol: str = "BTCUSDC") -> Optional[float]:
         """
         Obtiene la tarifa total promedio (maker y taker) para un par específico.
         """

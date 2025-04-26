@@ -53,15 +53,15 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [pair for pair in market_data if pair["symbol"].endswith("USDT")]
+        usdc_pairs = [pair for pair in market_data if pair["symbol"].endswith("USDC")]
 
         if by == "price":
-            sorted_pairs = sorted(usdt_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
+            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
         elif by == "volume":
-            sorted_pairs = sorted(usdt_pairs, key=lambda x: float(x["quoteVolume"]), reverse=True)
+            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["quoteVolume"]), reverse=True)
         else:
             logger.warning(f"Criterio desconocido: {by}. Usando 'price' por defecto.")
-            sorted_pairs = sorted(usdt_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
+            sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x["lastPrice"]), reverse=True)
 
         top_cryptos = sorted_pairs[:top_n]
         # logger.info(f"Top {top_n} criptomonedas por {by}: {top_cryptos}")
@@ -107,8 +107,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        top_gainers = sorted(usdt_pairs, key=lambda x: float(x['priceChangePercent']), reverse=True)[:limit]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        top_gainers = sorted(usdc_pairs, key=lambda x: float(x['priceChangePercent']), reverse=True)[:limit]
         # logger.info(f"Top {limit} ganadores: {top_gainers}")
         return top_gainers
 
@@ -123,8 +123,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        top_losers = sorted(usdt_pairs, key=lambda x: float(x['priceChangePercent']))[:limit]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        top_losers = sorted(usdc_pairs, key=lambda x: float(x['priceChangePercent']))[:limit]
         # logger.info(f"Top {limit} perdedores: {top_losers}")
         return top_losers
 
@@ -139,8 +139,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        most_popular = sorted(usdt_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        most_popular = sorted(usdc_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]
         # logger.info(f"Criptomonedas más populares: {most_popular}")
         return most_popular
 
@@ -155,8 +155,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        popular_mid_price = [coin for coin in usdt_pairs if 0.5 <= float(coin['lastPrice']) <= 2.5]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        popular_mid_price = [coin for coin in usdc_pairs if 0.5 <= float(coin['lastPrice']) <= 2.5]
         popular_mid_price_sorted = sorted(popular_mid_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio intermedio: {popular_mid_price_sorted}")
         return popular_mid_price_sorted
@@ -172,8 +172,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        popular_low_price = [coin for coin in usdt_pairs if 0.01 <= float(coin['lastPrice']) <= 0.5]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        popular_low_price = [coin for coin in usdc_pairs if 0.01 <= float(coin['lastPrice']) <= 0.5]
         popular_low_price_sorted = sorted(popular_low_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio bajo: {popular_low_price_sorted}")
         return popular_low_price_sorted
@@ -189,8 +189,8 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
-        popular_extra_low_price = [coin for coin in usdt_pairs if 0.00001 <= float(coin['lastPrice']) <= 0.01]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
+        popular_extra_low_price = [coin for coin in usdc_pairs if 0.00001 <= float(coin['lastPrice']) <= 0.01]
         popular_extra_low_price_sorted = sorted(popular_extra_low_price, key=lambda x: float(x['volume']), reverse=True)[:limit]
         # logger.info(f"Criptomonedas populares con precio muy bajo: {popular_extra_low_price_sorted}")
         return popular_extra_low_price_sorted
@@ -211,9 +211,9 @@ class BinanceMarketClient(BaseClient):
             logger.debug("No se pudo obtener información del mercado.")
             return []
 
-        usdt_pairs = [coin for coin in data if coin['symbol'].endswith('USDT')]
+        usdc_pairs = [coin for coin in data if coin['symbol'].endswith('USDC')]
         filtered_pairs = [
-            coin for coin in usdt_pairs 
+            coin for coin in usdc_pairs 
             if min_price <= float(coin['lastPrice']) <= max_price
         ]
         sorted_pairs = sorted(filtered_pairs, key=lambda x: float(x['volume']), reverse=True)[:limit]

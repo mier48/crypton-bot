@@ -10,7 +10,7 @@ def get_decimals_for_symbol(symbol_data: Dict[str, Any], symbol_name: str) -> Op
 
     Args:
         symbol_data (dict): Binance API data (full response).
-        symbol_name (str): Symbol name, e.g., "BTCUSDT".
+        symbol_name (str): Symbol name, e.g., "BTCUSDC".
 
     Returns:
         int: Number of allowed decimals for the quantity.

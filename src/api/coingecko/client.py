@@ -46,7 +46,7 @@ class CoinGeckoClient:
         """
         Busca el ID de una moneda a partir de su símbolo.
         """
-        keywords_to_remove = ["usd", "usdc", "usdt", "eur"]
+        keywords_to_remove = ["usd", "usdc", "usdc", "eur"]
         symbol_cleaned = symbol.lower()
         for keyword in keywords_to_remove:
             symbol_cleaned = symbol_cleaned.replace(keyword, "")

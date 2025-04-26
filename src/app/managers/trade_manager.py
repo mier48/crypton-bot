@@ -1,5 +1,4 @@
 import time
-from concurrent.futures import ThreadPoolExecutor
 from utils.logger import setup_logger
 
 from api.binance.data_manager import BinanceDataManager
@@ -10,7 +9,14 @@ from app.analyzers.pre_trade_analyzer import PreTradeAnalyzer
 from app.executors.trade_executor import TradeExecutor
 from app.managers.buy_manager import BuyManager
 from app.managers.sell_manager import SellManager
-from app.notifier import TelegramNotifier
+from app.notifiers.telegram_notifier import TelegramNotifier
+from config.settings import settings
+from app.services.asset_filter import AssetFilter
+from app.services.quantity_calculator import QuantityCalculator
+from app.services.buy_decision_engine import BuyDecisionEngine
+from app.services.price_calculator import PriceCalculator
+from app.services.sell_decision_engine import SellDecisionEngine
+from app.services.investment_calculator import InvestmentCalculator
 
 from config.default import (
     DEFAULT_PROFIT_MARGIN,
@@ -26,8 +32,6 @@ class TradeManager:
     """
     Clase para coordinar el análisis de tendencias y automatización de trading en el mercado de criptomonedas.
     """
-
-    
 
     def __init__(
         self,
@@ -62,63 +66,95 @@ class TradeManager:
         self.use_open_ai_api = use_open_ai_api
         self.running = False
 
-        # Inicializar gestores de compra y venta
+        # Inicializar componentes de compra
+        asset_filter = AssetFilter(self.data_manager, settings)
+        quantity_calculator = QuantityCalculator(self.data_manager, settings)
+        investment_calculator = InvestmentCalculator()
+        buy_decision_engine = BuyDecisionEngine(
+            self.openai_client,
+            self.sentiment_analyzer,
+            self.coin_gecko_client,
+            self.data_manager
+        )
         self.buy_manager = BuyManager(
-            data_manager=self.data_manager,
+            data_provider=self.data_manager,
             executor=self.executor,
-            openai_client=self.openai_client,
+            asset_filter=asset_filter,
+            quantity_calculator=quantity_calculator,
+            decision_engine=buy_decision_engine,
+            investment_calculator=investment_calculator,
             sentiment_analyzer=self.sentiment_analyzer,
-            coin_gecko_client=self.coin_gecko_client,
-            profit_margin=self.profit_margin,
-            stop_loss_margin=self.stop_loss_margin,
-            investment_amount=self.investment_amount,
-            use_open_ai_api=self.use_open_ai_api,
             max_records=max_records,
             max_workers=max_workers
         )
 
+        # Inicializar componentes de venta
+        price_calculator = PriceCalculator()
+        sell_decision_engine = SellDecisionEngine(
+            self.openai_client,
+            self.sentiment_analyzer,
+            self.coin_gecko_client,
+            price_calculator
+        )
         self.sell_manager = SellManager(
-            data_manager=self.data_manager,
+            data_provider=self.data_manager,
             executor=self.executor,
             sentiment_analyzer=self.sentiment_analyzer,
-            coin_gecko_client=self.coin_gecko_client,
-            openai_client=self.openai_client,
+            price_calculator=price_calculator,
+            decision_engine=sell_decision_engine,
             profit_margin=self.profit_margin,
             stop_loss_margin=self.stop_loss_margin,
-            use_open_ai_api=self.use_open_ai_api,
+            min_trade_usd=settings.MIN_TRADE_USD
         )
 
     def run(self) -> None:
         """
-        Inicia el proceso combinado de análisis de tendencias para comprar y automatización de ventas para vender.
+        Inicia la automatización secuencial de ventas y compras.
         """
         self.running = True
-        logging.info("Inicio de la automatización combinada de compras y ventas.")
-
-        # pre_trade_analyzer = PreTradeAnalyzer()
-
-        # should_trade, reason = pre_trade_analyzer.should_trade()
-
-        # while True:
-        # if should_trade:
-        logging.info("Condiciones de mercado favorables. Iniciando automatización\n\n")
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
+        logging.info("Inicio de la automatización secuencial de ventas y compras.")
+        logging.info("Condiciones de mercado favorables. Iniciando automatización secuencial.\n\n")
+        try:
             while self.running:
+                # Primero ejecutar ventas, luego compras
                 try:
-                    # Ejecutar análisis de compra y venta en paralelo
-                    executor.submit(self.buy_manager.analyze_and_execute_buys)
-                    executor.submit(self.sell_manager.analyze_and_execute_sells)
-
-                    time.sleep(self.sleep_interval)
-
-                except KeyboardInterrupt:
-                    self.running = False
-                    logging.info("Automatización combinada detenida por el usuario.")
-
+                    self.sell_manager.analyze_and_execute_sells()
                 except Exception as e:
-                    self.running = False
-                    logging.error(f"Error en la automatización combinada: {e}")
-        # else:
-            # logging.info(f"No se realizarán operaciones: {reason}")
-                # time.sleep(60*30) # Esperar 30 minutos antes de volver a verificar las condiciones del mercado
+                    logging.error(f"Error en análisis de venta: {e}")
+                try:
+                    self.buy_manager.analyze_and_execute_buys()
+                except Exception as e:
+                    logging.error(f"Error en análisis de compra: {e}")
+                time.sleep(self.sleep_interval)
+        except KeyboardInterrupt:
+            self.stop()
+            logging.info("Automatización secuencial detenida por el usuario.")
+
+    def stop(self) -> None:
+        """
+        Detiene la automatización combinada.
+        """
+        self.running = False
+        logging.info("TradeManager detenido por señal externa.")
+
+    def _buy_loop(self) -> None:
+        """
+        Loop que ejecuta comprobaciones de compra periódicamente.
+        """
+        while self.running:
+            try:
+                self.buy_manager.analyze_and_execute_buys()
+            except Exception as e:
+                logging.error(f"Error en buy loop: {e}")
+            time.sleep(self.sleep_interval)
+
+    def _sell_loop(self) -> None:
+        """
+        Loop que ejecuta comprobaciones de venta periódicamente.
+        """
+        while self.running:
+            try:
+                self.sell_manager.analyze_and_execute_sells()
+            except Exception as e:
+                logging.error(f"Error en sell loop: {e}")
+            time.sleep(self.sleep_interval)

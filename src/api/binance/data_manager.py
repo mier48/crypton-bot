@@ -126,7 +126,7 @@ class BinanceDataManager:
         return self.account_client.get_all_orders(symbol, limit, start_time, end_time)
 
     ## Funcionalidades Combinadas
-    def fetch_combined_data(self, symbol: str = "BTCUSDT") -> Dict[str, Any]:
+    def fetch_combined_data(self, symbol: str = "BTCUSDC") -> Dict[str, Any]:
         """
         Combina datos de precio y balance.
         """
@@ -139,7 +139,7 @@ class BinanceDataManager:
         logger.debug(f"Datos combinados: {combined_data}")
         return combined_data
 
-    def fetch_market_and_account_data(self, symbol: str = "BTCUSDT", top_n: int = 10) -> Dict[str, Any]:
+    def fetch_market_and_account_data(self, symbol: str = "BTCUSDC", top_n: int = 10) -> Dict[str, Any]:
         """
         Obtiene precio, balances y las principales criptomonedas del mercado.
         """
@@ -158,14 +158,14 @@ class BinanceDataManager:
     
     def get_market_volatility(
         self,
-        symbol: str = "BTCUSDT",
+        symbol: str = "BTCUSDC",
         interval: str = "1h",
         lookback: int = 24
     ) -> Optional[float]:
         """
         Calcula la volatilidad del mercado para un símbolo específico basado en los datos de velas.
 
-        :param symbol: Par de trading, por ejemplo, 'BTCUSDT'.
+        :param symbol: Par de trading, por ejemplo, 'BTCUSDC'.
         :param interval: Intervalo de tiempo de las velas, por ejemplo, '1h' para una hora.
         :param lookback: Número de velas a considerar para el cálculo.
         :return: Volatilidad calculada como la desviación estándar de los rendimientos logarítmicos.

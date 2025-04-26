@@ -1,8 +1,10 @@
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 from api.openai.client import OpenAIClient
 from app.analyzers.sentiment_analyzer import SentimentAnalyzer
 from api.coingecko.client import CoinGeckoClient
 from config.settings import settings
+import shap
+import numpy as np
 
 
 class BaseDecisionEngine:
@@ -59,3 +61,10 @@ class BaseDecisionEngine:
             Optional[str]: OpenAI response or None.
         """
         return self.openai_client.send_prompt(prompt)
+
+    def explain(self, features: Dict[str, Any]) -> Dict[str, float]:
+        """
+        Generate SHAP-like explanation for features. Stub returns zeros; integrate real SHAP explainer as needed.
+        """
+        # TODO: replace stub with actual shap.Explainer logic
+        return {k: 0.0 for k in features.keys()}

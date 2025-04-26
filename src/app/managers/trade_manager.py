@@ -151,18 +151,18 @@ class TradeManager:
                 #         logging.error(f"Error en estrategia {strat.name()}: {e}")
                 logging.warning(f"Bucle de compra y venta finalizado, esperando {self.sleep_interval} segundos.")
                 # Enviar balance vía Telegram
-                try:
-                    balances = self.data_manager.get_balance_summary()
-                    lines = ["*Resumen de balances:*"]
-                    for b in balances:
-                        asset = b.get("asset")
-                        free = float(b.get("free", 0))
-                        locked = float(b.get("locked", 0))
-                        lines.append(f"🔹 *{asset}:* Libre `{free:.6f}`, Bloqueado `{locked:.6f}`")
-                    message = "\n".join(lines)
-                    self.notifier.send_message(message)
-                except Exception as e:
-                    logging.exception(f"Error al enviar balance: {e}")
+                # try:
+                #     balances = self.data_manager.get_balance_summary()
+                #     lines = ["*Resumen de balances:*"]
+                #     for b in balances:
+                #         asset = b.get("asset")
+                #         free = float(b.get("free", 0))
+                #         locked = float(b.get("locked", 0))
+                #         lines.append(f"🔹 *{asset}:* Libre `{free:.6f}`, Bloqueado `{locked:.6f}`")
+                #     message = "\n".join(lines)
+                #     self.notifier.send_message(message)
+                # except Exception as e:
+                #     logging.exception(f"Error al enviar balance: {e}")
                 time.sleep(self.sleep_interval)
         except KeyboardInterrupt:
             self.stop()

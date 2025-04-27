@@ -229,11 +229,11 @@ class BuyManager(BuyUseCase):
                 next((b['free'] for b in self.data_provider.get_balance_summary() if b['asset'] == 'USDC'), 0.0)
             )
             # Calcular asignación de capital según sentimiento
-            sentiment_score = self.sentiment_analyzer.get_overall_sentiment(symbol.replace("USDC", ""))
-            allocation = self.investment_calculator.calculate_size(usdc_balance, sentiment_score)
-            quantity = self.quantity_calculator.calculate(symbol, allocation)
+            # sentiment_score = self.sentiment_analyzer.get_overall_sentiment(symbol.replace("USDC", ""))
+            # allocation = self.investment_calculator.calculate_size(usdc_balance, sentiment_score)
+            quantity = self.quantity_calculator.calculate(symbol)
             if quantity <= 0:
-                logging.info(f"Cantidad a comprar 0 para {symbol} con allocation {allocation:.2f} USDC")
+                logging.info(f"Cantidad a comprar 0 para {symbol}")
                 continue
             indicators = analysis.get('indicators', {})
             should = True # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)

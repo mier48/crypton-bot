@@ -9,12 +9,11 @@ class QuantityCalculator:
         self.data_provider = data_provider
         self.investment_amount = settings.INVESTMENT_AMOUNT
 
-    def calculate(self, symbol: str, balance_usdc: float) -> float:
-        # No usar inversión fija; si no hay monto, nada que comprar
-        if balance_usdc <= 0:
-            return 0.0
+    def calculate(self, symbol: str) -> float:
         price = self.data_provider.get_price(symbol)
         if price is None or price <= 0:
             return 0.0
-        # Calcular cantidad según monto USDC proporcionado
-        return balance_usdc / price
+        # Calcular cantidad usando monto fijo de inversión
+        if self.investment_amount <= 0:
+            return 0.0
+        return self.investment_amount / price

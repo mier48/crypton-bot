@@ -237,17 +237,18 @@ class MarketAnalyzer:
         # Verificar si se cumple el MIN_SCORE
         if score >= MIN_SCORE:
             logger.info(f"[{self.symbol}] Señal de compra detectada ({score} / {MIN_SCORE} puntos).")
+            return True
             # Calcular el precio de venta necesario
-            sell_price = self.calculate_sell_price(latest)
-            # Validar el precio de venta
-            if self.is_sell_price_valid(sell_price):
-                logger.info("Señal de compra válida detectada.")
-                return True
-            else:
-                # Marcar y descartar señal temporalmente
-                self.sell_price_invalid = True
-                logger.info(f"[{self.symbol}] Señal de compra descartada: El precio de venta necesario (${sell_price:.6f}) excede el máximo histórico ajustado.")
-                return False
+            # sell_price = self.calculate_sell_price(latest)
+            # # Validar el precio de venta
+            # if self.is_sell_price_valid(sell_price):
+            #     logger.info("Señal de compra válida detectada.")
+            #     return True
+            # else:
+            #     # Marcar y descartar señal temporalmente
+            #     self.sell_price_invalid = True
+            #     logger.info(f"[{self.symbol}] Señal de compra descartada: El precio de venta necesario (${sell_price:.6f}) excede el máximo histórico ajustado.")
+            #     return False
         # No se cumplió el umbral de indicadores
         return False
 

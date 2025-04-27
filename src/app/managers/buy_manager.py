@@ -240,9 +240,9 @@ class BuyManager(BuyUseCase):
             # Permitir compra si override de burbuja o precio override
             if analysis.get('bubble_override') or analysis.get('sell_price_override') or should:
                 # Verificar límites de exposición
-                if not self.risk_manager.can_open_position(current_price, quantity):
-                    logging.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
-                    continue
+                # if not self.risk_manager.can_open_position(current_price, quantity):
+                #     logging.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
+                #     continue
                 # Ejecutar compra
                 self._make_action(symbol, current_price, quantity)
                 # Programar stop-loss/take-profit automáticos

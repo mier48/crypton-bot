@@ -128,6 +128,10 @@ class TradeManager:
                     self.buy_manager.analyze_and_execute_buys()
                 except Exception as e:
                     logging.error(f"Error en análisis de compra: {e}")
+                try:
+                    self.sell_manager.analyze_and_execute_sells()
+                except Exception as e:
+                    logging.error(f"Error en análisis de venta: {e}")
                 # # Ejecutar estrategias pluginizadas
                 # for strat in self.strategies:
                 #     try:

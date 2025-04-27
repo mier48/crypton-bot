@@ -10,10 +10,7 @@ class QuantityCalculator:
         self.investment_amount = settings.INVESTMENT_AMOUNT
 
     def calculate(self, symbol: str) -> float:
-        price = self.data_provider.get_price(symbol)
-        if price is None or price <= 0:
-            return 0.0
-        # Calcular cantidad usando monto fijo de inversión
-        if self.investment_amount <= 0:
-            return 0.0
-        return self.investment_amount / price
+        """
+        Retorna el monto fijo de inversión a gastar como quoteOrderQty en compra MARKET.
+        """
+        return max(0.0, self.investment_amount)

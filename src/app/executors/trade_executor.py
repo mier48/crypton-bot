@@ -140,3 +140,9 @@ class TradeExecutor:
     def _get_balance(self, balances: list[Dict[str, str]], asset: str) -> float:
         """Obtiene el balance disponible de un activo específico."""
         return next((float(item['free']) for item in balances if item['asset'] == asset), 0.0)
+
+    def submit_oco_order(self, symbol: str, size: Optional[float], stop_price: float, limit_price: float) -> None:
+        """
+        Placeholder para órdenes OCO (stop-loss + take-profit).
+        """
+        logger.info(f"[OCO] Programada orden para {symbol}: stop={stop_price:.6f}, limit={limit_price:.6f}")

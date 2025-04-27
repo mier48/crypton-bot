@@ -194,6 +194,8 @@ class MarketAnalyzer:
                     if up_frac >= BUBBLE_MOMENTUM_THRESHOLD:
                         logger.info(f"[{self.symbol}] Override burbuja por momentum: {up_frac:.2%} velas alcistas.")
                         self.bubble_override = True
+                        # Compra garantizada al superar momentum override
+                        return True
                     else:
                         logger.warning(f"[{self.symbol}] No hay suficientes velas alcistas para override de burbuja: {up_frac:.2%} velas alcistas. Minimo {BUBBLE_MOMENTUM_THRESHOLD:.2%} velas alcistas.")
                         return False

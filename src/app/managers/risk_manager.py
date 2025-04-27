@@ -59,7 +59,10 @@ class RiskManager:
         balances = self.data_provider.get_balance_summary()
         capital = float(next((b['free'] for b in balances if b['asset'] == 'USDC'), 0.0))
         notional = price * size
-        return (self.current_exposure() + notional) <= (capital * self.max_exposure_pct)
+        # Validar que exista saldo USDC suficiente
+        if capital < notional:
+            return False
+        return True
 
     def apply_stop_take(self, symbol: str, entry_price: float, stop_loss_pct: float, take_profit_pct: float):
         """

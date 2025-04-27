@@ -2,6 +2,7 @@ from textblob import TextBlob
 from app.managers.trends_manager import TrendsManager
 from api.openai.client import OpenAIClient
 from api.news.newsapi.client import NewsAPIClient
+from api.news.reddit.client import RedditClient
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -22,7 +23,9 @@ class SentimentAnalyzer:
         :return: Puntaje de sentimiento promedio.
         """
         news_api_client = NewsAPIClient(page_size=limit)
-        trends_manager = TrendsManager(news_client=news_api_client)
+        # Instanciar cliente de Reddit para social media
+        reddit_client = RedditClient()
+        trends_manager = TrendsManager(news_client=news_api_client, reddit_client=reddit_client)
         articles = trends_manager.fetch_trends(keyword, limit=limit)
         sentiments = [
             self._analyze(" ".join(filter(None, [article.get("title"), article.get("description"), article.get("content")])))

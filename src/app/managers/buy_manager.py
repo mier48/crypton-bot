@@ -236,7 +236,7 @@ class BuyManager(BuyUseCase):
                 logging.info(f"Cantidad a comprar 0 para {symbol} con allocation {allocation:.2f} USDC")
                 continue
             indicators = analysis.get('indicators', {})
-            should = self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
+            should = True # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
             # Permitir compra si override de burbuja o precio override
             if analysis.get('bubble_override') or analysis.get('sell_price_override') or should:
                 # Verificar límites de exposición

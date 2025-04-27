@@ -5,6 +5,7 @@ from utils.metrics import start_metrics_server
 from utils.logger import setup_logger
 import threading
 import time
+from datetime import datetime
 
 logger = setup_logger(__name__)
 
@@ -15,13 +16,15 @@ def notification_loop(data_manager, notifier, interval_minutes):
     while True:
         try:
             balances = data_manager.get_balance_summary()
-            # Formatear mensaje de balances
-            lines = ["*Resumen de balances:*"]
+            now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+            # Tabla monoespaciada
+            lines = [f" *Resumen de Balances* ({now_str})", "```", f"{'Activo':<10} {'Libre':>12} {'Bloqueado':>12}"]
             for b in balances:
                 asset = b.get("asset")
                 free = float(b.get("free", 0))
                 locked = float(b.get("locked", 0))
-                lines.append(f" *{asset}:* Libre `{free:.6f}`, Bloqueado `{locked:.6f}`")
+                lines.append(f"{asset:<10} {free:>12.6f} {locked:>12.6f}")
+            lines.append("```")
             message = "\n".join(lines)
             notifier.send_message(message)
         except Exception as e:

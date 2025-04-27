@@ -2,13 +2,13 @@ from typing import Dict
 
 DEFAULT_PROFIT_MARGIN = 3 # 3% profit margin
 DEFAULT_SLEEP_INTERVAL = 90 # 90 seconds wait interval
-DEFAULT_INVESTMENT_AMOUNT = 15 # $25 investment per trade
-DEFAULT_MAX_BUY_PRICE = 5 # $5 maximum unit purchase price
+DEFAULT_INVESTMENT_AMOUNT = 20 # $20 investment per trade (ajustado según usuario)
+DEFAULT_MAX_BUY_PRICE = 5 # $5 maximum unit purchase price (fijo)
 DEFAULT_LOT_SIZE_FILTER = "LOT_SIZE" # Lot size filter
-DEFAULT_VALIDATION_MIN_SCORE = 5 # Minimum validation score
+DEFAULT_VALIDATION_MIN_SCORE = 3 # Minimum validation score (reducido para ser menos estricto)
 DEFAULT_STOP_LOSS_MARGIN = 15 # 25% stop loss margin
 DEFAULT_CHECK_PRICE_INTERVAL = "2m" # 2-minute price interval for scalping rápido
-DEFAULT_HISTORICAL_RANGE_HOURS = 5  # 5-hour histórico ajustado para trading rápido
+DEFAULT_HISTORICAL_RANGE_HOURS = 4  # 4-hour histórico ajustado para trading rápido
 DEFAULT_EXT_HISTORICAL_MULTIPLIER = 2  # Multiplier for extended historical range during sell_price validation
 DEFAULT_USE_OPEN_AI_API = False # Do not use OpenAI API by default
 DEFAULT_MAX_EXPOSURE_PERCENT = 50  # Porcentaje máximo de exposición total (0-100)
@@ -133,4 +133,4 @@ BUY_THRESHOLD_ADX = 25
 BUY_THRESHOLD_STOCHASTIC = 20
 
 # Puntuación mínima de indicadores para señal de compra
-DEFAULT_VALIDATION_MIN_SCORE = 4
+DEFAULT_VALIDATION_MIN_SCORE = 3

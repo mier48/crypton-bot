@@ -40,7 +40,7 @@ def main() -> None:
         max_records=settings.MAX_RECORDS,
         profit_margin=settings.PROFIT_MARGIN,
         stop_loss_margin=settings.STOP_LOSS_MARGIN,
-        sleep_interval=settings.SLEEP_INTERVAL,
+        sleep_interval=settings.SLEEP_INTERVAL, 
         investment_amount=settings.INVESTMENT_AMOUNT,
         max_workers=settings.MAX_WORKERS,
         use_open_ai_api=settings.USE_OPEN_AI_API
@@ -51,10 +51,10 @@ def main() -> None:
     signal.signal(signal.SIGTERM, lambda s, f: trade_manager.stop())
 
     logger.info("Iniciando Crypton Bot...")
-    # Iniciar hilo de notificaciones periódicas (cada 60 minutos)
+    # Iniciar hilo de notificaciones periódicas (cada 90 minutos)
     threading.Thread(
         target=notification_loop,
-        args=(trade_manager.data_manager, trade_manager.notifier, 60),
+        args=(trade_manager.data_manager, trade_manager.notifier, 90),
         daemon=True
     ).start()
     trade_manager.run()

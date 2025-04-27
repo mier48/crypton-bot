@@ -55,7 +55,9 @@ class RiskManager:
         """
         Verifica si abrir una posición mantiene el capital dentro del límite de exposición.
         """
-        capital = float(self.data_provider.get_balance('USDC'))
+        # Obtener saldo USDC desde balance_summary
+        balances = self.data_provider.get_balance_summary()
+        capital = float(next((b['free'] for b in balances if b['asset'] == 'USDC'), 0.0))
         notional = price * size
         return (self.current_exposure() + notional) <= (capital * self.max_exposure_pct)
 

@@ -125,9 +125,20 @@ class SellManager(SellUseCase):
                     current_price = float(self.data_provider.get_price(symbol))
                     real_balance = float(asset['free'])
                     buy_orders = [o for o in asset_orders if o['side'] == 'BUY']
-                    sell_orders = [o for o in asset_orders if o['side'] == 'SELL']
-                    average_buy_price = self._get_average_buy_price(buy_orders, sell_orders, real_balance)
-                    percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100 if average_buy_price > 0 else 0.0
+                    # Calcular precio de compra: usar el más alto de las compras (peor caso) o la última
+                    buy_prices = []
+                    for o in buy_orders:
+                        qty = float(o.get('executedQty', 0))
+                        price = float(o.get('price', 0)) if float(o.get('price', 0)) > 0 else (float(o.get('cummulativeQuoteQty', 0)) / qty if qty else 0)
+                        if price > 0:
+                            buy_prices.append(price)
+                    if not buy_prices:
+                        logging.warning(f"No hay precios de compra válidos para {symbol} en quick_syms.")
+                        bubble_register(symbol)
+                        continue
+                    # Para evitar ganancias infladas, usamos el precio máximo pagado (worst-case)
+                    purchase_price = max(buy_prices)
+                    percentage_gain = ((current_price - purchase_price) / purchase_price) * 100
                     threshold = 2.0  # % de beneficio mínimo para venta rápida por burbuja
                     if percentage_gain >= threshold:
                         logging.info(f"Venta rápida por bubble_override para {symbol} con ganancia {percentage_gain:.2f}% >= {threshold}%.")

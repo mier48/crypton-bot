@@ -96,6 +96,7 @@ class TelegramNotifier:
         emoji_reason = {
             "STOP_LOSS": "🚨 *STOP LOSS TRIGGERED* 🚨",
             "PROFIT_TARGET": "🎯 *PROFIT TARGET REACHED* 🎯",
+            "BUBBLE_QUICK_SELL": "💥 *BUBBLE QUICK SELL EXECUTED* 💥",
         }
         reason_text = emoji_reason.get(reason, header)
 
@@ -118,6 +119,11 @@ class TelegramNotifier:
                 base_message += (
                     f"🟢 *Profit:* `{percentage_gain:.2f}%`\n"
                     f"💰 _Profit secured._"
+                )
+            elif reason == "BUBBLE_QUICK_SELL":
+                base_message += (
+                    f"📉 *Quick Sell:* `{percentage_gain:.2f}%`\n"
+                    f"💥 _Bubble quick sell executed._"
                 )
             else:
                 base_message += (

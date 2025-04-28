@@ -8,6 +8,7 @@ from utils.logger import setup_logger
 from app.services.price_calculator import PriceCalculator
 from app.services.sell_decision_engine import SellDecisionEngine
 from config.settings import settings
+from app.utils.bubble_registry import get_and_clear_all, register as bubble_register
 
 logging = setup_logger()
 
@@ -118,15 +119,35 @@ class SellManager(SellUseCase):
             try:
                 symbol = f"{asset['asset']}USDC"
                 asset_orders = self.data_provider.get_all_orders(symbol)
-                # Venta rápida si fue compra bajo override de burbuja
-                from app.utils.bubble_registry import get_and_clear_all
                 quick_syms = get_and_clear_all()
                 if symbol in quick_syms:
-                    logging.info(f"Venta rápida por bubble_override para {symbol}.")
                     current_price = float(self.data_provider.get_price(symbol))
                     real_balance = float(asset['free'])
-                    # Forzar venta de todas las posiciones
-                    # self.executor.execute_trade('SELL', symbol, 'MARKET', real_balance, reason='BUBBLE_QUICK_SELL')
+                    buy_orders = [o for o in asset_orders if o['side'] == 'BUY']
+                    sell_orders = [o for o in asset_orders if o['side'] == 'SELL']
+                    average_buy_price = self._get_average_buy_price(buy_orders, sell_orders, real_balance)
+                    percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100 if average_buy_price > 0 else 0.0
+                    threshold = 1.0  # % de beneficio mínimo para venta rápida por burbuja
+                    if percentage_gain >= threshold:
+                        logging.info(f"Venta rápida por bubble_override para {symbol} con ganancia {percentage_gain:.2f}% >= {threshold}%.")
+                        try:
+                            trade_result = self.executor.execute_trade(
+                                side="SELL",
+                                symbol=symbol,
+                                order_type="MARKET",
+                                positions=real_balance,
+                                reason="BUBBLE_QUICK_SELL",
+                                percentage_gain=percentage_gain
+                            )
+                            if trade_result:
+                                logging.info(f"Orden de venta rápida por burbuja ejecutada para {symbol}.\n")
+                            else:
+                                logging.error(f"Orden de venta rápida por burbuja fallida para {symbol}.\n")
+                        except Exception as e:
+                            logging.error(f"Error al ejecutar venta rápida por burbuja para {symbol}: {e}")
+                    else:
+                        logging.info(f"[{symbol}] Ganancia {percentage_gain:.2f}% inferior a umbral rápido por burbuja {threshold}%, reintentando más tarde.")
+                        bubble_register(symbol)
                     continue
 
                 if not asset_orders:

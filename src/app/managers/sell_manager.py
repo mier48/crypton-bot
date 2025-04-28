@@ -128,7 +128,7 @@ class SellManager(SellUseCase):
                     sell_orders = [o for o in asset_orders if o['side'] == 'SELL']
                     average_buy_price = self._get_average_buy_price(buy_orders, sell_orders, real_balance)
                     percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100 if average_buy_price > 0 else 0.0
-                    threshold = 1.0  # % de beneficio mínimo para venta rápida por burbuja
+                    threshold = 2.0  # % de beneficio mínimo para venta rápida por burbuja
                     if percentage_gain >= threshold:
                         logging.info(f"Venta rápida por bubble_override para {symbol} con ganancia {percentage_gain:.2f}% >= {threshold}%.")
                         try:

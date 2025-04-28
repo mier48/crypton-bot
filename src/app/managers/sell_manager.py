@@ -126,7 +126,7 @@ class SellManager(SellUseCase):
                     current_price = float(self.data_provider.get_price(symbol))
                     real_balance = float(asset['free'])
                     # Forzar venta de todas las posiciones
-                    self.executor.execute_trade('SELL', symbol, 'MARKET', real_balance, reason='BUBBLE_QUICK_SELL')
+                    # self.executor.execute_trade('SELL', symbol, 'MARKET', real_balance, reason='BUBBLE_QUICK_SELL')
                     continue
 
                 if not asset_orders:

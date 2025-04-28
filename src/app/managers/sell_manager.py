@@ -114,12 +114,13 @@ class SellManager(SellUseCase):
         sorted_assets = sorted(assets, key=lambda x: float(x['free']), reverse=True)
 
         self.show_portfolio(sorted_assets)
+        # Obtener y limpiar símbolos marcados para venta rápida por burbuja (registro global)
+        quick_syms = get_and_clear_all()
 
         for asset in sorted_assets:
             try:
                 symbol = f"{asset['asset']}USDC"
                 asset_orders = self.data_provider.get_all_orders(symbol)
-                quick_syms = get_and_clear_all()
                 if symbol in quick_syms:
                     current_price = float(self.data_provider.get_price(symbol))
                     real_balance = float(asset['free'])

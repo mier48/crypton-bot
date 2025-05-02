@@ -65,7 +65,7 @@ BUBBLE_DETECT_WINDOW = 12       # Velas para medir crecimiento
 BUBBLE_MAX_GROWTH = 5.0         # % máximo permitido en ese window
 DEFAULT_PROFIT_MARGIN = 1.5     # % objetivo de ganancia
 DEFAULT_STOP_LOSS_MARGIN = 2.0  # % stop-loss
-DEFAULT_INvestMENT_AMOUNT = 50  # USDC por trade
+DEFAULT_INVESTMENT_AMOUNT = 50  # USDC por trade
 DEFAULT_SLEEP_INTERVAL = 60     # segundos entre ciclos
 ```
 Y en `config/settings.py` o `.env`:

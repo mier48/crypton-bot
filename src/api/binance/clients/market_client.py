@@ -1,12 +1,7 @@
-# src/api/binance/clients/market_client.py
-
 from typing import Any, Dict, List, Optional
-from api.binance.clients.base_client import BaseClient
-from utils.logger import setup_logger
-from config.binance import BINANCE_BASE_URL
-
-logger = setup_logger()
-
+from src.api.binance.clients.base_client import BaseClient
+from src.config.binance import BINANCE_BASE_URL
+from loguru import logger
 
 class BinanceMarketClient(BaseClient):
     def __init__(self, base_url: str = None):
@@ -55,7 +50,7 @@ class BinanceMarketClient(BaseClient):
         response = self.get(endpoint, params=params)
         if response and "symbols" in response:
             is_available = any(symbol["symbol"] == pair for symbol in response["symbols"])
-            logger.debug(f"Verificación del par {pair}: {'Disponible' if is_available else 'No disponible'}")
+            #logger.debug(f"Verificación del par {pair}: {'Disponible' if is_available else 'No disponible'}")
             return is_available
         return False
 
@@ -68,10 +63,10 @@ class BinanceMarketClient(BaseClient):
         data = self.get(endpoint, params=params)
         if data and "price" in data:
             price = float(data["price"])
-            logger.debug(f"Precio de {symbol}: {price}")
+            #logger.debug(f"Precio de {symbol}: {price}")
             return price
         else:
-            logger.debug(f"No se pudo obtener el precio para {symbol}.")
+            #logger.debug(f"No se pudo obtener el precio para {symbol}.")
             return None
 
     def get_top_cryptocurrencies(self, top_n: int = 10, by: str = "price") -> List[Dict[str, Any]]:
@@ -81,12 +76,12 @@ class BinanceMarketClient(BaseClient):
         market_data = self._get_24hr_data()
         usdc_pairs = self._filter_usdc(market_data)
         if by not in ("price", "volume"):
-            logger.warning(f"Criterio desconocido: {by}. Usando 'price'.")
+            #logger.warning(f"Criterio desconocido: {by}. Usando 'price'.")
             by = "price"
         key = "lastPrice" if by == "price" else "quoteVolume"
         sorted_pairs = sorted(usdc_pairs, key=lambda x: float(x.get(key, 0)), reverse=True)
         top_cryptos = sorted_pairs[:top_n]
-        # logger.info(f"Top {top_n} criptomonedas por {by}: {top_cryptos}")
+        # #logger.info(f"Top {top_n} criptomonedas por {by}: {top_cryptos}")
         return top_cryptos
 
     def fetch_historical_data(
@@ -99,19 +94,50 @@ class BinanceMarketClient(BaseClient):
     ) -> Optional[List[Any]]:
         """
         Obtiene datos históricos para un símbolo y período específicos.
+        
+        Args:
+            symbol: Símbolo del par de trading (ej: 'BTCUSDC')
+            start_time: Tiempo de inicio en milisegundos (opcional)
+            end_time: Tiempo de fin en milisegundos (opcional)
+            interval: Intervalo de tiempo para los datos (ej: '1h', '4h', '1d')
+            limit: Número máximo de velas a devolver (máx. 1000)
+            
+        Returns:
+            Lista de velas históricas o None si hay un error
+            
+        Notas:
+            - Si no se proporcionan start_time ni end_time, devuelve las velas más recientes
+            - Si solo se proporciona start_time, devuelve desde ese momento hasta ahora
+            - Si se proporcionan ambos, devuelve el rango especificado
         """
         endpoint = "api/v3/klines"
-        params = {"symbol": symbol, "interval": interval, "limit": limit}
+        params = {
+            "symbol": symbol.upper(),  # Asegurar que el símbolo esté en mayúsculas
+            "interval": interval,
+            "limit": min(limit, 1000)  # Asegurar que no se exceda el límite de Binance
+        }
+        
+        # Solo agregar start_time si se proporciona
         if start_time is not None:
             params["startTime"] = start_time
-        if end_time is not None:
-            params["endTime"] = end_time
-        data = self.get(endpoint, params=params)
-        if data:
-            # logger.info(f"Datos históricos obtenidos para {symbol}.")
+            
+            # Solo agregar end_time si se proporciona y es mayor que start_time
+            if end_time is not None and end_time > start_time:
+                params["endTime"] = end_time
+        
+        try:
+            #logger.debug(f"Solicitando datos históricos para {symbol} - Intervalo: {interval}")
+            data = self.get(endpoint, params=params)
+            
+            if not data:
+                #logger.debug(f"No se obtuvieron datos para {symbol} con params: {params}")
+                return None
+                
+            #logger.debug(f"Datos obtenidos para {symbol}: {len(data)} velas")
             return data
-        else:
-            logger.debug(f"debug al obtener datos históricos. Endpoint: {endpoint} | Params: {params} | Response: {data}")
+            
+        except Exception as e:
+            #logger.error(f"Error al obtener datos históricos para {symbol}: {e}")
             return None
 
     def get_top_gainers(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -121,7 +147,7 @@ class BinanceMarketClient(BaseClient):
         data = self._get_24hr_data()
         pairs = self._filter_usdc(data)
         top_gainers = sorted(pairs, key=lambda x: float(x.get('priceChangePercent', 0)), reverse=True)[:limit]
-        # logger.info(f"Top {limit} ganadores: {top_gainers}")
+        # #logger.info(f"Top {limit} ganadores: {top_gainers}")
         return top_gainers
 
     def get_top_losers(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -131,7 +157,7 @@ class BinanceMarketClient(BaseClient):
         data = self._get_24hr_data()
         pairs = self._filter_usdc(data)
         top_losers = sorted(pairs, key=lambda x: float(x.get('priceChangePercent', 0)))[:limit]
-        # logger.info(f"Top {limit} perdedores: {top_losers}")
+        # #logger.info(f"Top {limit} perdedores: {top_losers}")
         return top_losers
 
     def get_most_popular(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -141,7 +167,7 @@ class BinanceMarketClient(BaseClient):
         data = self._get_24hr_data()
         pairs = self._filter_usdc(data)
         most_popular = sorted(pairs, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
-        # logger.info(f"Criptomonedas más populares: {most_popular}")
+        # #logger.info(f"Criptomonedas más populares: {most_popular}")
         return most_popular
 
     def get_popular_mid_price(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -152,7 +178,7 @@ class BinanceMarketClient(BaseClient):
         pairs = self._filter_usdc(data)
         popular_mid_price = [c for c in pairs if 0.5 <= float(c.get('lastPrice', 0)) <= 2.5]
         popular_mid_price_sorted = sorted(popular_mid_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
-        # logger.info(f"Criptomonedas populares con precio intermedio: {popular_mid_price_sorted}")
+        # #logger.info(f"Criptomonedas populares con precio intermedio: {popular_mid_price_sorted}")
         return popular_mid_price_sorted
 
     def get_popular_low_price(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -163,7 +189,7 @@ class BinanceMarketClient(BaseClient):
         pairs = self._filter_usdc(data)
         popular_low_price = [c for c in pairs if 0.01 <= float(c.get('lastPrice', 0)) <= 0.5]
         popular_low_price_sorted = sorted(popular_low_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
-        # logger.info(f"Criptomonedas populares con precio bajo: {popular_low_price_sorted}")
+        # #logger.info(f"Criptomonedas populares con precio bajo: {popular_low_price_sorted}")
         return popular_low_price_sorted
 
     def get_popular_extra_low_price(self, limit: int = 10) -> List[Dict[str, Any]]:
@@ -174,7 +200,7 @@ class BinanceMarketClient(BaseClient):
         pairs = self._filter_usdc(data)
         popular_extra_low_price = [c for c in pairs if 0.00001 <= float(c.get('lastPrice', 0)) <= 0.01]
         popular_extra_low_price_sorted = sorted(popular_extra_low_price, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
-        # logger.info(f"Criptomonedas populares con precio muy bajo: {popular_extra_low_price_sorted}")
+        # #logger.info(f"Criptomonedas populares con precio muy bajo: {popular_extra_low_price_sorted}")
         return popular_extra_low_price_sorted
 
     def get_popular_by_price_range(self, min_price: float, max_price: float, limit: int = 10) -> List[Dict[str, Any]]:
@@ -190,5 +216,5 @@ class BinanceMarketClient(BaseClient):
         pairs = self._filter_usdc(data)
         filtered_pairs = [c for c in pairs if min_price <= float(c.get('lastPrice', 0)) <= max_price]
         sorted_pairs = sorted(filtered_pairs, key=lambda x: float(x.get('volume', 0)), reverse=True)[:limit]
-        logger.debug(f"Criptomonedas populares en rango {min_price}-{max_price}: {sorted_pairs}")
+        #logger.debug(f"Criptomonedas populares en rango {min_price}-{max_price}: {sorted_pairs}")
         return sorted_pairs

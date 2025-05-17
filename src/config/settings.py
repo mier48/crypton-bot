@@ -5,7 +5,7 @@ from typing import Dict, Any
 
 class Settings(BaseSettings):
     MAX_RECORDS: int = Field(500, env="MAX_RECORDS")
-    PROFIT_MARGIN: float = Field(3.0, env="PROFIT_MARGIN")  # Ajustado al default 3%
+    PROFIT_MARGIN: float = Field(2.0, env="PROFIT_MARGIN")  # Ajustado al default 2%
     STOP_LOSS_MARGIN: float = Field(15.0, env="STOP_LOSS_MARGIN")  # 15%
     SLEEP_INTERVAL: int = Field(90, env="SLEEP_INTERVAL")
     INVESTMENT_AMOUNT: float = Field(15.0, env="INVESTMENT_AMOUNT")  # Fijo a $15 según usuario

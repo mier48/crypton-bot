@@ -1,10 +1,8 @@
 import requests
 from typing import Optional
 from datetime import datetime
-from utils.logger import setup_logger
 from config.telegram import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
-
-logger = setup_logger(__name__)
+from loguru import logger
 
 class TelegramNotifier:
     def __init__(self):

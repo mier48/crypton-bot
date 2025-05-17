@@ -1,5 +1,5 @@
 import pandas as pd
-import logging
+from loguru import logger
 from config.default import (
     SMA_SHORT_PERIOD, SMA_LONG_PERIOD, EMA_PERIOD, RSI_PERIOD,
     MACD_SHORT_PERIOD, MACD_LONG_PERIOD, MACD_SIGNAL_PERIOD,
@@ -10,9 +10,6 @@ from config.default import (
     BUBBLE_DETECT_WINDOW, BUBBLE_MAX_GROWTH,
     BUBBLE_MOMENTUM_WINDOW, BUBBLE_MOMENTUM_THRESHOLD
 )
-from utils.logger import setup_logger
-
-logger = setup_logger()
 
 class MarketAnalyzer:
     """
@@ -74,12 +71,12 @@ class MarketAnalyzer:
         """Calcula las Medias Móviles Simples (SMA)."""
         self.df['sma_short'] = self.df['close'].rolling(window=SMA_SHORT_PERIOD).mean()
         self.df['sma_long'] = self.df['close'].rolling(window=SMA_LONG_PERIOD).mean()
-        logger.debug("SMA calculadas.")
+        #logger.debug("SMA calculadas.")
 
     def _calculate_ema(self):
         """Calcula la Media Móvil Exponencial (EMA)."""
         self.df['ema'] = self.df['close'].ewm(span=EMA_PERIOD, adjust=False).mean()
-        logger.debug("EMA calculada.")
+        #logger.debug("EMA calculada.")
 
     def _calculate_rsi(self):
         """Calcula el Índice de Fuerza Relativa (RSI)."""
@@ -88,7 +85,7 @@ class MarketAnalyzer:
         loss = (-delta.where(delta < 0, 0)).rolling(window=RSI_PERIOD).mean()
         rs = gain / loss
         self.df['rsi'] = 100 - (100 / (1 + rs))
-        logger.debug("RSI calculado.")
+        #logger.debug("RSI calculado.")
 
     def _calculate_macd(self):
         """Calcula el MACD y su línea de señal."""
@@ -96,7 +93,7 @@ class MarketAnalyzer:
                            self.df['close'].ewm(span=MACD_LONG_PERIOD, adjust=False).mean()
         self.df['macd_signal'] = self.df['macd'].ewm(span=MACD_SIGNAL_PERIOD, adjust=False).mean()
         self.df['macd_hist'] = self.df['macd'] - self.df['macd_signal']
-        logger.debug("MACD calculado.")
+        #logger.debug("MACD calculado.")
 
     def _calculate_bollinger_bands(self):
         """Calcula las Bandas de Bollinger."""
@@ -104,7 +101,7 @@ class MarketAnalyzer:
         rolling_std = self.df['close'].rolling(window=BB_PERIOD).std()
         self.df['bb_upper'] = rolling_mean + (rolling_std * BB_STD_DEV)
         self.df['bb_lower'] = rolling_mean - (rolling_std * BB_STD_DEV)
-        logger.debug("Bandas de Bollinger calculadas.")
+        #logger.debug("Bandas de Bollinger calculadas.")
 
     def _calculate_adx(self):
         """Calcula el Average Directional Index (ADX)."""
@@ -129,19 +126,19 @@ class MarketAnalyzer:
         df['adx'] = df['dx'].rolling(window=ADX_PERIOD).mean()
 
         self.df['adx'] = df['adx']
-        logger.debug("ADX calculado.")
+        #logger.debug("ADX calculado.")
 
     def _calculate_stochastic(self):
         """Calcula el Oscilador Estocástico."""
         low_min = self.df['close'].rolling(window=STOCHASTIC_PERIOD).min()
         high_max = self.df['close'].rolling(window=STOCHASTIC_PERIOD).max()
         self.df['stochastic'] = 100 * (self.df['close'] - low_min) / (high_max - low_min)
-        logger.debug("Oscilador Estocástico calculado.")
+        #logger.debug("Oscilador Estocástico calculado.")
 
     def _calculate_volume(self):
         """Calcula el promedio de volumen."""
         self.df['volume_ma'] = self.df['volume'].rolling(window=20).mean()
-        logger.debug("Promedio de volumen calculado.")
+        #logger.debug("Promedio de volumen calculado.")
 
     def _latest(self):
         """Obtiene los últimos valores de los indicadores."""
@@ -156,7 +153,7 @@ class MarketAnalyzer:
         :return: Precio de venta necesario.
         """
         sell_price = latest['close'] * (1 + profit_margin)
-        logger.debug(f"Precio de venta calculado: {sell_price}")
+        #logger.debug(f"Precio de venta calculado: {sell_price}")
         return sell_price
 
     def is_sell_price_valid(self, sell_price, safety_margin=0.855):
@@ -216,25 +213,25 @@ class MarketAnalyzer:
         # Sumar puntuaciones
         if sma_condition:
             score += 1
-            logger.debug("Condición SMA cumplida.")
+            #logger.debug("Condición SMA cumplida.")
         if rsi_condition:
             score += 1
-            logger.debug("Condición RSI cumplida.")
+            #logger.debug("Condición RSI cumplida.")
         if macd_condition:
             score += 1
-            logger.debug("Condición MACD cumplida.")
+            #logger.debug("Condición MACD cumplida.")
         if bb_condition:
             score += 1
-            logger.debug("Condición Bandas de Bollinger cumplida.")
+            #logger.debug("Condición Bandas de Bollinger cumplida.")
         if adx_condition:
             score += 1
-            logger.debug("Condición ADX cumplida.")
+            #logger.debug("Condición ADX cumplida.")
         if stochastic_condition:
             score += 1
-            logger.debug("Condición Oscilador Estocástico cumplida.")
+            #logger.debug("Condición Oscilador Estocástico cumplida.")
 
-        # if score >= 4:
-        logger.info(f"[{self.symbol}] Puntuación total: {score} (Umbral requerido: {MIN_SCORE})")
+        if score >= 3:
+            logger.info(f"[{self.symbol}] Puntuación total: {score} (Umbral requerido: {MIN_SCORE})")
 
         # Verificar si se cumple el MIN_SCORE
         if score >= MIN_SCORE:
@@ -265,7 +262,7 @@ class MarketAnalyzer:
                 logger.info(f"[{self.symbol}] Recomendación: Comprar.\n")
                 return True
             else:
-                logger.info(f"[{self.symbol}] Recomendación: No comprar.\n")
+                #logger.info(f"[{self.symbol}] Recomendación: No comprar.\n")
                 return False
         except Exception as e:
             logger.error(f"[{self.symbol}] Error en el análisis: {e}")

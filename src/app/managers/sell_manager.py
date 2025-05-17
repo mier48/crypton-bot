@@ -1,16 +1,17 @@
 import time
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from prettytable import PrettyTable
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
 
 from domain.ports import TradeDataProvider, TradeExecutorPort, SellUseCase
 from app.analyzers.sentiment_analyzer import SentimentAnalyzer
-from utils.logger import setup_logger
 from app.services.price_calculator import PriceCalculator
 from app.services.sell_decision_engine import SellDecisionEngine
 from config.settings import settings
-from app.utils.bubble_registry import get_and_clear_all, register as bubble_register
-
-logging = setup_logger()
+from config.database import SQLALCHEMY_DATABASE_URL
+from models.asset import Asset
+from loguru import logger
 
 class SellManager(SellUseCase):
     """
@@ -38,6 +39,22 @@ class SellManager(SellUseCase):
         self.min_trade_usd = min_trade_usd
         # Estado para trailing stop: máximo precio alcanzado por símbolo
         self.trailing_highs: Dict[str, float] = {}
+        
+        # Configurar la conexión a la base de datos
+        self.engine = create_engine(SQLALCHEMY_DATABASE_URL)
+        
+    def get_asset_from_db(self, symbol: str) -> Optional[Asset]:
+        """
+        Obtiene un activo de la base de datos por su símbolo.
+        
+        Args:
+            symbol: Símbolo del activo (ej: 'BTC')
+            
+        Returns:
+            Objeto Asset si se encuentra, None en caso contrario
+        """
+        with Session(self.engine) as session:
+            return session.query(Asset).filter(Asset.symbol == symbol).first()
 
     def show_portfolio(self, balances: List[Dict[str, Any]]) -> None:
         """
@@ -48,6 +65,8 @@ class SellManager(SellUseCase):
         table = PrettyTable(["Activo", "Unidades disponibles"])
 
         for balance in balances:
+            if float(balance['free']) <= 1:
+                continue
             table.add_row([balance['asset'], balance['free']])
 
         print(f"{table}\n")
@@ -106,129 +125,113 @@ class SellManager(SellUseCase):
 
     def analyze_and_execute_sells(self) -> None:
         """
-        Analiza la cartera para determinar si es un buen momento para vender criptomonedas y ejecuta las ventas.
+        Analiza la cartera para determinar si es un buen momento para vender criptomonedas
+        basándose en los parámetros de la base de datos y ejecuta las ventas.
         """
         balances = self.data_provider.get_balance_summary()
-        usdc_balance = float(next((item['free'] for item in balances if item['asset'] == 'USDC'), 0.0))
-        assets = [balance for balance in balances if balance['asset'] != 'USDC' and float(balance['free']) > 1]
-        sorted_assets = sorted(assets, key=lambda x: float(x['free']), reverse=True)
-
-        self.show_portfolio(sorted_assets)
-        # Obtener y limpiar símbolos marcados para venta rápida por burbuja (registro global)
-        quick_syms = get_and_clear_all()
-
-        for asset in sorted_assets:
+        assets = [balance for balance in balances 
+                 if balance['asset'] != 'USDC' and float(balance['free']) > 0]
+        
+        if not assets:
+            logger.info("No hay activos para vender.")
+            return
+            
+        self.show_portfolio(assets)
+        
+        for asset in assets:
+            symbol = asset['asset']
+            symbol_pair = f"{symbol}USDC"
+            current_balance = float(asset['free'])
+            
             try:
-                symbol = f"{asset['asset']}USDC"
-                asset_orders = self.data_provider.get_all_orders(symbol)
-                if symbol in quick_syms:
-                    current_price = float(self.data_provider.get_price(symbol))
-                    real_balance = float(asset['free'])
-                    buy_orders = [o for o in asset_orders if o['side'] == 'BUY']
-                    # Calcular precio de compra: usar el más alto de las compras (peor caso) o la última
-                    buy_prices = []
-                    for o in buy_orders:
-                        qty = float(o.get('executedQty', 0))
-                        price = float(o.get('price', 0)) if float(o.get('price', 0)) > 0 else (float(o.get('cummulativeQuoteQty', 0)) / qty if qty else 0)
-                        if price > 0:
-                            buy_prices.append(price)
-                    if not buy_prices:
-                        logging.warning(f"No hay precios de compra válidos para {symbol} en quick_syms.")
-                        bubble_register(symbol)
-                        continue
-                    # Para evitar ganancias infladas, usamos el precio máximo pagado (worst-case)
-                    purchase_price = max(buy_prices)
-                    percentage_gain = ((current_price - purchase_price) / purchase_price) * 100
-                    threshold = 2.0  # % de beneficio mínimo para venta rápida por burbuja
-                    if percentage_gain >= threshold:
-                        logging.info(f"Venta rápida por bubble_override para {symbol} con ganancia {percentage_gain:.2f}% >= {threshold}%.")
-                        try:
-                            trade_result = self.executor.execute_trade(
-                                side="SELL",
-                                symbol=symbol,
-                                order_type="MARKET",
-                                positions=real_balance,
-                                reason="BUBBLE_QUICK_SELL",
-                                percentage_gain=percentage_gain
-                            )
-                            if trade_result:
-                                logging.info(f"Orden de venta rápida por burbuja ejecutada para {symbol}.\n")
-                            else:
-                                logging.error(f"Orden de venta rápida por burbuja fallida para {symbol}.\n")
-                        except Exception as e:
-                            logging.error(f"Error al ejecutar venta rápida por burbuja para {symbol}: {e}")
-                    else:
-                        logging.info(f"[{symbol}] Ganancia {percentage_gain:.2f}% inferior a umbral rápido por burbuja {threshold}%, reintentando más tarde.")
-                        bubble_register(symbol)
+                if current_balance <= 1:
+                    logger.info(f"No se vende {symbol} por debajo de 1 unidad.")
                     continue
 
-                if not asset_orders:
-                    logging.info(f"No se encontraron órdenes para {symbol}.")
+                # Obtener el activo de la base de datos
+                db_asset = self.get_asset_from_db(symbol)
+                if not db_asset:
+                    logger.warning(f"No se encontró el activo {symbol} en la base de datos.")
                     continue
-
-                buy_orders = [o for o in asset_orders if o['side'] == 'BUY']
-                sell_orders = [o for o in asset_orders if o['side'] == 'SELL']
-                real_balance = float(asset['free'])
-
-                if real_balance <= 0:
-                    logging.debug(f"Saldo real para {symbol} es {real_balance}, omitiendo.")
+                
+                # Obtener el precio actual
+                current_price = float(self.data_provider.get_price(symbol_pair))
+                if not current_price:
+                    logger.warning(f"No se pudo obtener el precio actual para {symbol_pair}")
                     continue
-
-                average_buy_price = self._get_average_buy_price(buy_orders, sell_orders, real_balance)
-                if average_buy_price == 0.0:
-                    logging.warning(f"No se pudo calcular el precio promedio de compra para {symbol}.")
-                    continue
-
-                target_price = self.calculate_target_price(
-                    buy_price=average_buy_price,
-                    buy_fee=0.001,
-                    sell_fee=0.001,
-                    quantity=real_balance,
-                    profit_margin=self.profit_margin
-                )
-                current_price = self.data_provider.get_price(symbol)
-
-                # Actualizar máximo histórico intra-trade para trailing stop
-                prev_high = self.trailing_highs.get(symbol, average_buy_price)
-                self.trailing_highs[symbol] = max(prev_high, current_price)
-                trailing_stop_price = self.trailing_highs[symbol] * (1 - (self.stop_loss_margin / 100))
-                stop_loss_price = trailing_stop_price
-
-                # Calcular porcentaje de ganancia o pérdida
-                percentage_gain = ((current_price - average_buy_price) / average_buy_price) * 100
-                percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
-
-                logging.info(f"Asset: {asset['asset']}")
-                logging.info(f"Precio Actual: ${current_price:,.8f}")
-                logging.info(f"Posiciones abiertas: {real_balance:,.2f}")
-                logging.info(f"Precio máximo alcanzado: {self.trailing_highs[symbol]:.8f}")
-                logging.info(f"Precio Promedio de Compra: ${average_buy_price:,.8f}")
-                logging.info(f"Precio Objetivo de Venta: ${target_price:,.8f}")
-                logging.info(f"Precio de Stop Loss: ${stop_loss_price:,.8f}")
-                logging.info(f"Porcentaje de Ganancia: {percentage_gain:.2f}%\n")
-                # logging.info(f"Porcentaje de Pérdida: {percentage_loss:.2f}%")
-
-                if current_price * real_balance < self.min_trade_usd:
-                    logging.info(f"Operación menor a mínimo {self.min_trade_usd} USD, omitiendo.")
-                    continue
-                decision = self.decision_engine.decide(asset, average_buy_price, current_price, real_balance)
-                # Evitar ventas por target si la ganancia neta es inferior al umbral configurado
-                if decision == "vender ganancia" and percentage_gain < self.profit_margin:
-                    logging.info(f"[{symbol}] Ganancia {percentage_gain:.2f}% menor al objetivo {self.profit_margin}%, omitiendo venta para cubrir comisiones.")
-                    continue
-                if decision != "mantener":
-                    self._make_action(decision, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss)
-
-                # Opcional: espera entre cada operación para evitar sobrecargar la API
-                time.sleep(2)
-
+                
+                # Calcular ganancia/pérdida porcentual
+                purchase_price = db_asset.purchase_price
+                percentage_gain = ((current_price - purchase_price) / purchase_price) * 100
+                
+                # Determinar el umbral de beneficio según los flags
+                if db_asset.is_bubble:
+                    profit_threshold = 1.0  # 1% para activos marcados como burbuja
+                    sell_reason = "BUBBLE_SELL"
+                elif db_asset.force_sell:
+                    profit_threshold = 0.25  # 0.25% para venta forzada
+                    sell_reason = "FORCE_SELL"
+                else:
+                    profit_threshold = self.profit_margin  # Margen de beneficio por defecto
+                    sell_reason = "PROFIT_TAKING"
+                
+                logger.info(f"Analizando {symbol}: "
+                            f"Compra=${purchase_price:.8f} "
+                            f"Actual=${current_price:.8f} "
+                            f"Ganancia={percentage_gain:.2f}% "
+                            f"(Umbral: {profit_threshold}%)")
+                
+                # Verificar si se debe vender
+                if percentage_gain >= profit_threshold:
+                    try:
+                        logger.info(f"Ejecutando venta de {symbol} con {percentage_gain:.2f}% de ganancia "
+                                    f"(umbral: {profit_threshold}%)")
+                        
+                        # Ejecutar la orden de venta
+                        trade_result = self.executor.execute_trade(
+                            side="SELL",
+                            symbol=symbol_pair,
+                            order_type="MARKET",
+                            positions=current_balance,
+                            reason=sell_reason,
+                            percentage_gain=percentage_gain
+                        )
+                        
+                        if trade_result:
+                            logger.info(f"Venta de {symbol} ejecutada exitosamente")
+                            
+                            # Actualizar el activo en la base de datos si es necesario
+                            with Session(self.engine) as session:
+                                db_asset = session.merge(db_asset)
+                                session.delete(db_asset)
+                                session.commit()
+                                logger.info(f"Activo {symbol} eliminado de la base de datos después de la venta")
+                        else:
+                            logger.error(f"Error al ejecutar la venta de {symbol}")
+                            
+                    except Exception as e:
+                        logger.error(f"Error al ejecutar la venta de {symbol}: {e}")
+                else:
+                    logger.info(f"{symbol}: No se vende. Ganancia actual {percentage_gain:.2f}% por debajo del umbral de +{profit_threshold}%")
+                    
+                    # Registrar información de seguimiento
+                    logger.info(f"Seguimiento {symbol}:")
+                    logger.info(f"- Precio Actual: ${current_price:,.8f}")
+                    logger.info(f"- Cantidad: {current_balance:,.8f}")
+                    logger.info(f"- Precio de Compra: ${purchase_price:,.8f}")
+                    logger.info(f"- Ganancia Actual: {percentage_gain:.2f}%")
+                    logger.info(f"- Umbral de Venta: {profit_threshold:.2f}%")
+                    
             except Exception as e:
-                logging.error(f"Error al procesar la venta para {symbol}: {e}")
+                logger.error(f"Error al procesar el activo {symbol}: {e}")
+            
+            # Pequeña pausa entre activos para no sobrecargar la API
+            time.sleep(1)
     
     def _make_action(self, action, symbol, average_buy_price, current_price, real_balance, percentage_gain, percentage_loss):
         if action == "vender pérdida":
             percentage_loss = ((average_buy_price - current_price) / average_buy_price) * 100
-            logging.info(f"Stop loss alcanzado. Vender para limitar pérdidas. -{percentage_loss:,.2f}%.\n")
+            logger.info(f"Stop loss alcanzado. Vender para limitar pérdidas. -{percentage_loss:,.2f}%.\n")
 
             try:
                 trade_result = self.executor.execute_trade(
@@ -240,13 +243,13 @@ class SellManager(SellUseCase):
                     percentage_gain=-percentage_loss
                 )
                 if trade_result:
-                    logging.info(f"Orden de venta por stop loss ejecutada para {symbol}.\n")
+                    logger.info(f"Orden de venta por stop loss ejecutada para {symbol}.\n")
                 else:
-                    logging.error(f"Orden de venta por stop loss no se ha podido ejecutar para {symbol}.\n")
+                    logger.error(f"Orden de venta por stop loss no se ha podido ejecutar para {symbol}.\n")
             except Exception as e:
-                logging.error(f"Error al ejecutar la venta por stop loss para {symbol}: {e}")
+                logger.error(f"Error al ejecutar la venta por stop loss para {symbol}: {e}")
         elif action == "vender ganancia":
-            logging.info(f"Objetivo de ganancia alcanzado. Vender para asegurar ganancias. +{percentage_gain:,.2f}%.\n")
+            logger.info(f"Objetivo de ganancia alcanzado. Vender para asegurar ganancias. +{percentage_gain:,.2f}%.\n")
 
             try:
                 trade_result = self.executor.execute_trade(
@@ -258,8 +261,8 @@ class SellManager(SellUseCase):
                     percentage_gain=percentage_gain
                 )
                 if trade_result:
-                    logging.info(f"Orden de venta por objetivo de ganancia ejecutada para {symbol}.\n")
+                    logger.info(f"Orden de venta por objetivo de ganancia ejecutada para {symbol}.\n")
                 else:
-                    logging.error(f"Orden de venta por objetivo de ganancia no se ha podido ejecutar para {symbol}.\n")
+                    logger.error(f"Orden de venta por objetivo de ganancia no se ha podido ejecutar para {symbol}.\n")
             except Exception as e:
-                logging.error(f"Error al ejecutar la venta por objetivo de ganancia para {symbol}: {e}")
+                logger.error(f"Error al ejecutar la venta por objetivo de ganancia para {symbol}: {e}")

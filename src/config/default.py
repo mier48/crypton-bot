@@ -1,6 +1,6 @@
 from typing import Dict
 
-DEFAULT_PROFIT_MARGIN = 2 # 2% profit margin
+DEFAULT_PROFIT_MARGIN = 3 # 2% profit margin
 DEFAULT_SLEEP_INTERVAL = 90 # 90 seconds wait interval
 DEFAULT_INVESTMENT_AMOUNT = 15 # $15 investment per trade (ajustado según usuario)
 DEFAULT_MAX_BUY_PRICE = 5 # $5 maximum unit purchase price (fijo)

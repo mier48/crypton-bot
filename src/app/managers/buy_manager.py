@@ -7,18 +7,21 @@ from prettytable import PrettyTable
 
 from domain.ports import TradeDataProvider, TradeExecutorPort, BuyUseCase
 from app.analyzers.market_analyzer import MarketAnalyzer
-from utils.logger import setup_logger
 from app.services.asset_filter import AssetFilter
 from app.services.quantity_calculator import QuantityCalculator
 from app.services.buy_decision_engine import BuyDecisionEngine
 from app.services.investment_calculator import InvestmentCalculator
 from app.analyzers.sentiment_analyzer import SentimentAnalyzer
 from config.settings import settings
+from config.default import DEFAULT_INVESTMENT_AMOUNT
 from config.default import BUY_CATEGORIES, INTERVAL_MAP
 from app.utils.bubble_registry import register as bubble_register
 from app.managers.risk_manager import RiskManager
-
-logging = setup_logger()
+from models.asset import Asset
+from loguru import logger
+from sqlalchemy.orm import Session
+from sqlalchemy import create_engine
+from config.database import SQLALCHEMY_DATABASE_URL
 
 class BuyManager(BuyUseCase):
     """
@@ -51,6 +54,9 @@ class BuyManager(BuyUseCase):
         # Risk management
         self.risk_manager = RiskManager(data_provider, executor)
 
+        # Configurar la conexión a la base de datos
+        self.engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
     def calculate_interval_in_milliseconds(self, interval: str) -> int:
         """
         Calcula la duración de un intervalo en milisegundos.
@@ -68,6 +74,7 @@ class BuyManager(BuyUseCase):
     ) -> List[List[Any]]:
         """
         Recopila todos los datos históricos para un símbolo dentro de un rango de tiempo.
+        Si no se pueden obtener datos con los parámetros de tiempo, intenta obtener los datos más recientes.
 
         :param symbol: Símbolo de la criptomoneda (e.g., "BTCUSDC").
         :param start_time: Tiempo de inicio en milisegundos.
@@ -77,32 +84,66 @@ class BuyManager(BuyUseCase):
         """
         all_data: List[List[Any]] = []
         interval_ms = self.calculate_interval_in_milliseconds(interval)
-        max_time_range = interval_ms * self.max_records
-
-        current_start = start_time
+        max_attempts = 3
+        
+        def fetch_data_with_retries(symbol: str, start: Optional[int], end: Optional[int], interval: str) -> Tuple[bool, List[List[Any]]]:
+            """Función auxiliar para reintentar la obtención de datos"""
+            for attempt in range(max_attempts):
+                try:
+                    data = self.data_provider.fetch_historical_data(
+                        symbol=symbol,
+                        start_time=start,
+                        end_time=end,
+                        interval=interval
+                    )
+                    
+                    if data:
+                        return True, data
+                        
+                    if attempt < max_attempts - 1:  # No es el último intento
+                        time.sleep(2)
+                        
+                except Exception as e:
+                    logger.warning(f"Intento {attempt + 1} fallido para {symbol}: {e}")
+                    if attempt < max_attempts - 1:  # No es el último intento
+                        time.sleep(2)
+                        
+            return False, []
+        
+        # Primero intentamos con los parámetros de tiempo especificados
+        success, data = fetch_data_with_retries(symbol, start_time, end_time, interval)
+        
+        if not success or not data:
+            #logger.warning(f"No se pudieron obtener datos históricos para {symbol} con los parámetros de tiempo especificados. Intentando obtener los datos más recientes...")
+            
+            # Si falla, intentamos sin parámetros de tiempo para obtener los datos más recientes
+            success, data = fetch_data_with_retries(symbol, None, None, interval)
+            
+            if not success or not data:
+                #logger.error(f"No se pudieron obtener datos históricos para {symbol} ni siquiera sin parámetros de tiempo.")
+                return []
+                
+            #logger.info(f"Se obtuvieron {len(data)} registros recientes para {symbol} (sin filtro de tiempo)")
+            return data
+            
+        # Si llegamos aquí, tenemos datos con los parámetros de tiempo especificados
+        all_data.extend(data)
+        current_start = int(data[-1][6]) + interval_ms
+        
+        # Continuar obteniendo datos en bloques si es necesario
         while current_start < end_time:
-            current_end = min(current_start + max_time_range, end_time)
-
-            try:
-                data = self.data_provider.fetch_historical_data(
-                    symbol, current_start, current_end, interval=interval
-                )
-                if not data:
-                    logging.debug(f"No se obtuvieron datos para {symbol} entre {current_start} y {current_end}.")
-                    break
-
-                all_data.extend(data)
-                current_start = int(data[-1][6])
-
-                if len(data) < self.max_records:
-                    logging.debug(f"Datos insuficientes para continuar: {len(data)} registros obtenidos.")
-                    break
-
-                time.sleep(2)  # Respetar límites de la API
-            except Exception as e:
-                logging.error(f"Error al obtener datos para {symbol}: {e}")
+            current_end = min(current_start + (interval_ms * self.max_records), end_time)
+            
+            success, data = fetch_data_with_retries(symbol, current_start, current_end, interval)
+            
+            if not data:
+                logger.warning(f"No se pudieron obtener más datos históricos para {symbol} a partir de {current_start}")
                 break
-
+                
+            all_data.extend(data)
+            current_start = int(data[-1][6]) + interval_ms
+            time.sleep(1)  # Pequeña pausa entre solicitudes
+        
         return all_data
 
     def _process_coin(self, coin: Dict[str, Any], start_time: int, end_time: int) -> Tuple[str, Optional[Dict[str, Any]]]:
@@ -116,10 +157,10 @@ class BuyManager(BuyUseCase):
         """
         symbol = coin.get('symbol')
         last_price = coin.get('lastPrice')
-        logging.info(f"[{symbol}] Recopilando datos históricos...")
+        #logger.info(f"[{symbol}] Recopilando datos históricos...")
         try:
             data = self.fetch_all_data(symbol, start_time, end_time)
-            logging.info(f"[{symbol}] Se han recopilado {len(data)} datos históricos.")
+            #logger.info(f"[{symbol}] Se han recopilado {len(data)} datos históricos.")
 
             if not data:
                 return symbol, None
@@ -151,7 +192,7 @@ class BuyManager(BuyUseCase):
                 ext_days = ext_hours / 24
                 now = datetime.now(timezone.utc)
                 ext_start = int((now - timedelta(hours=ext_hours)).timestamp() * 1000)
-                logging.info(
+                logger.info(
                     f"{symbol}: precio objetivo inválido, probando rango extendido: {ext_days:.0f}d ({ext_hours}h) x{settings.DEFAULT_EXT_HISTORICAL_MULTIPLIER}"
                 )
                 data_ext = self.fetch_all_data(symbol, ext_start, end_time)
@@ -161,18 +202,18 @@ class BuyManager(BuyUseCase):
                     valid2 = analyzer2.is_sell_price_valid(sell_price2)
                     if valid2:
                         analysis['sell_price_override'] = True
-                        logging.info(
+                        logger.info(
                             f"{symbol}: override de precio válido tras extensión: objetivo {sell_price2:.6f} <= max ajustado"
                         )
                     else:
-                        logging.info(
+                        logger.info(
                             f"{symbol}: sigue inválido tras extensión: objetivo {sell_price2:.6f} > max ajustado"
                         )
                 except Exception as e:
-                    logging.error(f"Error reanalizando {symbol} con rango ext: {e}")
+                    logger.error(f"Error reanalizando {symbol} con rango ext: {e}")
             return symbol, analysis
         except Exception as e:
-            logging.error(f"Error procesando {symbol}: {e}")
+            logger.error(f"Error procesando {symbol}: {e}")
             return symbol, None
 
     def analyze_and_execute_buys(self) -> None:
@@ -188,7 +229,7 @@ class BuyManager(BuyUseCase):
         coins_to_process = []
         for cfg in BUY_CATEGORIES:
             method = getattr(self.data_provider, cfg['method'])
-            logging.info(f"Procesando {cfg['name']}...")
+            logger.info(f"Procesando {cfg['name']}...")
             if 'min_price' in cfg and 'max_price' in cfg:
                 coins = method(cfg['min_price'], cfg['max_price'], cfg.get('limit', 50))
             else:
@@ -196,26 +237,26 @@ class BuyManager(BuyUseCase):
             # Si se obtienen menos monedas que el límite, rellenar con las más populares
             limit = cfg.get('limit', 50)
             if len(coins) < limit:
-                logging.warning(f"Solo se obtuvieron {len(coins)} de {limit} para {cfg['name']}, rellenando con más populares")
+                logger.warning(f"Solo se obtuvieron {len(coins)} de {limit} para {cfg['name']}, rellenando con más populares")
                 
             coins_to_process.extend(coins)
         # Excluir símbolos con datos históricos fallidos previos
         if self.failed_symbols:
             original = len(coins_to_process)
             coins_to_process = [c for c in coins_to_process if c['symbol'] not in self.failed_symbols]
-            logging.debug(f"Se excluyeron {original - len(coins_to_process)} símbolos sin histórico previo.")
-        logging.info(f"Se recuperaron {len(coins_to_process)} monedas para análisis técnico.")
+            logger.debug(f"Se excluyeron {original - len(coins_to_process)} símbolos sin histórico previo.")
+        logger.info(f"Se recuperaron {len(coins_to_process)} monedas para análisis técnico.")
 
         if not coins_to_process:
-            logging.info("No hay monedas para procesar en esta ejecución.")
+            logger.info("No hay monedas para procesar en esta ejecución.")
             return
 
         # Procesar cada moneda y actuar inmediatamente si hay señal
-        logging.info(f"Procesando {len(coins_to_process)} monedas secuencialmente para análisis técnico.\n")
+        logger.info(f"Procesando {len(coins_to_process)} monedas secuencialmente para análisis técnico.\n")
         for coin in coins_to_process:
             symbol, analysis = self._process_coin(coin, start_time, end_time)
             if not analysis:
-                logging.warning(f"No histórico para {symbol}. Se excluirá en siguientes iteraciones.\n")
+                logger.warning(f"No histórico para {symbol}. Se excluirá en siguientes iteraciones.\n")
                 self.failed_symbols.add(symbol)
                 continue
             if not analysis.get('trend'):
@@ -223,49 +264,97 @@ class BuyManager(BuyUseCase):
             # Filtrar el activo
             if symbol not in self.asset_filter.filter([symbol]):
                 continue
+            # Verificar si ya existe el activo en la base de datos
+            with Session(self.engine) as session:
+                existing_asset = session.query(Asset).filter(Asset.symbol == symbol.replace('USDC', '')).first()
+                if existing_asset:
+                    logger.info(f"El activo {symbol} ya existe en la base de datos. Omitiendo compra.")
+                    continue
+
             # Obtener precio y saldo actual antes de cada decisión
             current_price = self.data_provider.get_price(symbol)
             usdc_balance = float(
                 next((b['free'] for b in self.data_provider.get_balance_summary() if b['asset'] == 'USDC'), 0.0)
             )
-            # Calcular asignación de capital según sentimiento
-            # sentiment_score = self.sentiment_analyzer.get_overall_sentiment(symbol.replace("USDC", ""))
-            # allocation = self.investment_calculator.calculate_size(usdc_balance, sentiment_score)
+            
             quantity = self.quantity_calculator.calculate(symbol)
             if quantity <= 0:
-                logging.info(f"Cantidad a comprar 0 para {symbol}")
+                logger.info(f"Cantidad a comprar 0 para {symbol}")
                 continue
+                
             indicators = analysis.get('indicators', {})
-            should = True # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
+            is_bubble = analysis.get('bubble_override', False)
+            should = usdc_balance >= DEFAULT_INVESTMENT_AMOUNT  # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
+            
             # Permitir compra si override de burbuja o precio override
-            if analysis.get('bubble_override') or analysis.get('sell_price_override') or should:
+            if is_bubble or analysis.get('sell_price_override') or should:
                 # Verificar límites de exposición
                 if not self.risk_manager.can_open_position(current_price, quantity):
-                    logging.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
+                    logger.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
                     continue
                 # Ejecutar compra
-                self._make_action(symbol, current_price, quantity)
-                # Programar stop-loss/take-profit automáticos
-                stop_pct = settings.STOP_LOSS_MARGIN / 100
-                take_pct = settings.PROFIT_MARGIN / 100
-                self.risk_manager.apply_stop_take(symbol, current_price, stop_pct, take_pct)
-                # Registrar compra rápida si override de burbuja
-                if analysis.get('bubble_override'):
-                    bubble_register(symbol)
+                if self._make_action(symbol, current_price, quantity, is_bubble):
+                    # Programar stop-loss/take-profit automáticos
+                    stop_pct = settings.STOP_LOSS_MARGIN / 100
+                    take_pct = settings.PROFIT_MARGIN / 100
+                    self.risk_manager.apply_stop_take(symbol, current_price, stop_pct, take_pct)
+                    
+                    # Registrar compra rápida si es burbuja
+                    if is_bubble:
+                        bubble_register(symbol)
+                        logger.info(f"Compra de burbuja registrada para {symbol}")
                 # Esperar un poco para no saturar la API ni la cuenta
                 time.sleep(5)
 
-    def _make_action(self, symbol: str, current_price: float, quantity_to_buy: float) -> None:
+    def _make_action(self, symbol: str, current_price: float, quantity_to_buy: float, is_bubble: bool = False) -> bool:
+        """
+        Ejecuta una orden de compra y guarda el activo en la base de datos.
+        
+        Args:
+            symbol: Símbolo del activo (ej: 'BTCUSDC')
+            current_price: Precio actual por unidad
+            quantity_to_buy: Cantidad a comprar
+            is_bubble: Indica si es una compra por burbuja
+            
+        Returns:
+            bool: True si la operación fue exitosa, False en caso contrario
+        """
+        # Ejecutar la orden de compra
         trade_result = self.executor.execute_trade(
             side="BUY",
             symbol=symbol,
             order_type="MARKET",
             positions=quantity_to_buy,
             price=current_price,
-            reason="MANUAL_DECISION",
+            reason="BUBBLE_BUY" if is_bubble else "REGULAR_BUY",
         )
 
-        if trade_result:
-            logging.info(f"Orden de compra ejecutada para {symbol}.")
-        else: 
-            logging.error(f"Error al procesar la compra para {symbol}")
+        if not trade_result:
+            logger.error(f"Error al procesar la compra para {symbol}")
+            return False
+            
+        logger.info(f"Orden de compra ejecutada para {symbol}.")
+        
+        try:
+            # Guardar el activo en la base de datos
+            with Session(self.engine) as session:
+                asset = Asset(
+                    symbol=symbol.replace('USDC', ''),  # Guardar solo el símbolo sin USDC
+                    purchase_price=float(current_price),
+                    amount=float(quantity_to_buy),
+                    total_purchase_price=float(current_price) * float(quantity_to_buy),
+                    is_bubble=is_bubble,
+                    force_sell=is_bubble  # Si es burbuja, forzar venta en el futuro
+                )
+                session.add(asset)
+                session.commit()
+                logger.info(f"Activo {symbol} registrado en la base de datos")
+                return True
+                
+        except Exception as e:
+            logger.error(f"Error al guardar el activo {symbol} en la base de datos: {e}")
+            try:
+                session.rollback()
+            except:
+                pass
+            return False

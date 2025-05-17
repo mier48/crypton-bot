@@ -1,6 +1,4 @@
 import time
-from utils.logger import setup_logger
-
 from api.binance.data_manager import BinanceDataManager
 from api.openai.client import OpenAIClient
 from api.coingecko.client import CoinGeckoClient
@@ -18,6 +16,7 @@ from app.services.price_calculator import PriceCalculator
 from app.services.sell_decision_engine import SellDecisionEngine
 from app.services.investment_calculator import InvestmentCalculator
 from app.strategies.loader import load_strategies  # Import plugin loader
+from loguru import logger
 
 from config.default import (
     DEFAULT_PROFIT_MARGIN,
@@ -27,7 +26,6 @@ from config.default import (
     DEFAULT_USE_OPEN_AI_API
 )
 
-logging = setup_logger()
 
 class TradeManager:
     """
@@ -110,74 +108,73 @@ class TradeManager:
         # Cargar estrategias de plugins
         self.strategies = load_strategies(self.data_manager, settings)
 
+    def has_available_funds(self) -> bool:
+        """
+        Verifica si hay fondos disponibles para realizar compras.
+        
+        Returns:
+            bool: True si hay fondos disponibles, False en caso contrario.
+        """
+        try:
+            # Obtener el balance de USDC
+            balances = self.data_manager.get_balance_summary()
+            usdc_balance = next((float(b['free']) for b in balances if b['asset'] == 'USDC'), 0.0)
+            
+            # Verificar si hay suficiente saldo para la inversión mínima
+            has_funds = usdc_balance >= self.investment_amount
+            
+            if not has_funds:
+                logger.warning(f"Sin fondos suficientes. Saldo USDC: {usdc_balance:.2f}, Mínimo requerido: {self.investment_amount:.2f}")
+            
+            return has_funds
+            
+        except Exception as e:
+            logger.error(f"Error al verificar fondos disponibles: {e}")
+            return False
+
     def run(self) -> None:
         """
         Inicia la automatización secuencial de ventas y compras.
         """
         self.running = True
-        logging.info("Inicio de la automatización secuencial de ventas y compras.")
-        logging.info("Condiciones de mercado favorables. Iniciando automatización secuencial.\n\n")
+        logger.info("Inicio de la automatización secuencial de ventas y compras.")
+        logger.info("Condiciones de mercado favorables. Iniciando automatización secuencial.\n\n")
         try:
             while self.running:
-                # Primero ejecutar ventas, luego compras
+                # Primero ejecutar ventas (siempre se ejecuta para liberar fondos)
                 try:
                     self.sell_manager.analyze_and_execute_sells()
                 except Exception as e:
-                    logging.error(f"Error en análisis de venta: {e}")
-                try:
-                    self.buy_manager.analyze_and_execute_buys()
-                except Exception as e:
-                    logging.error(f"Error en análisis de compra: {e}")
+                    logger.error(f"Error en análisis de venta: {e}")
+                
+                # Verificar fondos antes de intentar comprar
+                if self.has_available_funds():
+                    try:
+                        self.buy_manager.analyze_and_execute_buys()
+                    except Exception as e:
+                        logger.error(f"Error en análisis de compra: {e}")
+                else:
+                    logger.info("Omitiendo análisis de compras por fondos insuficientes")
+                
+                # Ejecutar ventas nuevamente por si se liberaron fondos con las compras
                 try:
                     self.sell_manager.analyze_and_execute_sells()
                 except Exception as e:
-                    logging.error(f"Error en análisis de venta: {e}")
-                # # Ejecutar estrategias pluginizadas
-                # for strat in self.strategies:
-                #     try:
-                #         signals = strat.analyze()
-                #         symbol = signals.get('symbol')
-                #         size = signals.get('size', self.investment_amount)
-                #         order_type = signals.get('order_type', 'MARKET')
-                #         # Señal de compra
-                #         if signals.get('buy') and symbol:
-                #             self.executor.execute_trade(
-                #                 'BUY', symbol, order_type, size,
-                #                 reason=f"{strat.name()} buy"
-                #             )
-                #         # Señal de venta
-                #         if signals.get('sell') and symbol:
-                #             self.executor.execute_trade(
-                #                 'SELL', symbol, order_type, size,
-                #                 reason=f"{strat.name()} sell"
-                #             )
-                #     except Exception as e:
-                #         logging.error(f"Error en estrategia {strat.name()}: {e}")
-                logging.warning(f"Bucle de compra y venta finalizado, esperando {self.sleep_interval} segundos.")
-                # Enviar balance vía Telegram
-                # try:
-                #     balances = self.data_manager.get_balance_summary()
-                #     lines = ["*Resumen de balances:*"]
-                #     for b in balances:
-                #         asset = b.get("asset")
-                #         free = float(b.get("free", 0))
-                #         locked = float(b.get("locked", 0))
-                #         lines.append(f"🔹 *{asset}:* Libre `{free:.6f}`, Bloqueado `{locked:.6f}`")
-                #     message = "\n".join(lines)
-                #     self.notifier.send_message(message)
-                # except Exception as e:
-                #     logging.exception(f"Error al enviar balance: {e}")
+                    logger.error(f"Error en análisis de venta: {e}")
+                
+                logger.warning(f"Bucle de compra y venta finalizado, esperando {self.sleep_interval} segundos.")
                 time.sleep(self.sleep_interval)
+                
         except KeyboardInterrupt:
             self.stop()
-            logging.info("Automatización secuencial detenida por el usuario.")
+            logger.info("Automatización secuencial detenida por el usuario.")
 
     def stop(self) -> None:
         """
         Detiene la automatización combinada.
         """
         self.running = False
-        logging.info("TradeManager detenido por señal externa.")
+        logger.info("TradeManager detenido por señal externa.")
 
     def _buy_loop(self) -> None:
         """
@@ -187,7 +184,7 @@ class TradeManager:
             try:
                 self.buy_manager.analyze_and_execute_buys()
             except Exception as e:
-                logging.error(f"Error en buy loop: {e}")
+                logger.error(f"Error en buy loop: {e}")
             time.sleep(self.sleep_interval)
 
     def _sell_loop(self) -> None:
@@ -198,5 +195,5 @@ class TradeManager:
             try:
                 self.sell_manager.analyze_and_execute_sells()
             except Exception as e:
-                logging.error(f"Error en sell loop: {e}")
+                logger.error(f"Error en sell loop: {e}")
             time.sleep(self.sleep_interval)

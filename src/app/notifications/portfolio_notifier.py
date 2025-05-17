@@ -52,7 +52,7 @@ def send_portfolio_update(data_manager: Any, notifier: Any) -> None:
                     amount = asset.amount
                     
                     # Calcular valores
-                    invested = purchase_price * amount
+                    invested = asset.total_purchase_price
                     current_value = current_price * amount
                     profit_loss = current_value - invested
                     profit_loss_pct = (profit_loss / invested) * 100 if invested > 0 else 0

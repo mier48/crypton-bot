@@ -94,9 +94,24 @@ class TradeExecutor:
             return False
 
     def _format_quantity(self, positions: float, decimals: int) -> float:
-        """Formatea la cantidad de posiciones según los decimales permitidos."""
-        quantity = round(positions, decimals)
-        return float(f"{quantity:.1f}") if decimals == 0 else quantity
+        """Formatea la cantidad de posiciones según los decimales permitidos.
+        
+        Args:
+            positions: Cantidad a formatear
+            decimals: Número de decimales permitidos
+            
+        Returns:
+            float: Cantidad formateada sin redondear hacia abajo
+        """
+        # Convertir a string, redondear a los decimales permitidos sin redondear hacia abajo
+        str_qty = f"{positions:.8f}"  # Usar 8 decimales como máximo
+        if '.' in str_qty:
+            # Tomar la parte entera y los decimales permitidos
+            int_part, dec_part = str_qty.split('.')
+            dec_part = dec_part[:decimals] if decimals > 0 else ''
+            # Reconstruir la cantidad como float
+            return float(f"{int_part}.{dec_part}" if dec_part else int_part)
+        return float(str_qty)
 
     def _process_order(
         self, 

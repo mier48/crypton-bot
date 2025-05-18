@@ -242,6 +242,16 @@ class BinanceAccountClient(BaseClient):
             
             response = self.post(endpoint, params=params)
             
+            if isinstance(response, dict) and response.get('error'):
+                # Manejar el error devuelto por el método post
+                error_msg = (
+                    f"❌ Error {response.get('status_code', '')} - {response.get('message', 'Error desconocido')} "
+                    f"(Code: {response.get('code', 'N/A')}) - {side} {symbol}"
+                )
+                logger.error(error_msg)
+                self.telegram_notifier.send_message(error_msg)
+                return None
+                
             if not response:
                 error_msg = f"❌ Error: Respuesta vacía al crear orden {type_} {side} para {symbol}"
                 logger.error(error_msg)

@@ -210,9 +210,20 @@ class BaseClient:
             logger.debug(f"Endpoint: {url}, Params: {params}, Headers: {headers}")
             return None
 
-    def post(self, endpoint: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def post(self, endpoint: str, params: Optional[Dict[str, Any]] = None, headers: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Realiza una solicitud POST.
+        
+        Returns:
+            Dict: Si la solicitud es exitosa, devuelve la respuesta JSON.
+                  Si hay un error, devuelve un diccionario con la estructura:
+                  {
+                      'error': True,
+                      'status_code': int,  # Código de estado HTTP
+                      'code': int,          # Código de error de Binance (si existe)
+                      'message': str,      # Mensaje de error
+                      'raw_error': Any      # Error original completo
+                  }
         """
         url = urljoin(self.base_url, endpoint)
         try:
@@ -220,16 +231,41 @@ class BaseClient:
             response = self.session.post(url, params=params, headers=headers, timeout=self.timeout)
             response.raise_for_status()
             return response.json()
+            
         except requests.exceptions.HTTPError as http_err:
-            # Intenta obtener más detalles del error
+            error_info = {
+                'error': True,
+                'status_code': http_err.response.status_code if hasattr(http_err, 'response') else None,
+                'code': None,
+                'message': str(http_err),
+                'raw_error': http_err
+            }
+            
+            # Intentar obtener más detalles del error de Binance
             try:
-                error_info = response.json()
-                logger.error(f"HTTP error occurred: {http_err} - Detalles: {error_info}")
-            except ValueError:
-                # Si la respuesta no es JSON, simplemente registra el texto
-                logger.error(f"HTTP error occurred: {http_err} - Respuesta: {response.text}")
-            return None
+                if hasattr(http_err, 'response') and http_err.response:
+                    error_data = http_err.response.json()
+                    error_info.update({
+                        'code': error_data.get('code'),
+                        'message': error_data.get('msg', str(http_err)),
+                        'raw_error': error_data
+                    })
+                logger.error(f"HTTP error {error_info['status_code']} - {error_info['message']} (Code: {error_info['code']})")
+            except (ValueError, AttributeError) as e:
+                # Si la respuesta no es JSON o hay otro error al procesarla
+                if hasattr(http_err, 'response') and http_err.response:
+                    error_info['message'] = http_err.response.text or str(http_err)
+                logger.error(f"HTTP error occurred: {http_err}")
+                
+            return error_info
+            
         except requests.exceptions.RequestException as req_err:
-            # Maneja otras excepciones de Requests
+            error_info = {
+                'error': True,
+                'status_code': None,
+                'code': None,
+                'message': str(req_err),
+                'raw_error': req_err
+            }
             logger.error(f"Request exception occurred: {req_err}")
-            return None
+            return error_info

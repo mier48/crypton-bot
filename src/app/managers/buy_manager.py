@@ -253,9 +253,21 @@ class BuyManager(BuyUseCase):
             logger.info("No hay monedas para procesar en esta ejecución.")
             return
 
+        # Obtener saldo inicial de USDC
+        usdc_balance = float(
+            next((b['free'] for b in self.data_provider.get_balance_summary() if b['asset'] == 'USDC'), 0.0)
+        )
+        logger.info(f"Saldo inicial de USDC: {usdc_balance:.2f}")
+
         # Procesar cada moneda y actuar inmediatamente si hay señal
         logger.info(f"Procesando {len(coins_to_process)} monedas secuencialmente para análisis técnico.\n")
+        
         for coin in coins_to_process:
+            # Verificar saldo antes de cada iteración
+            if usdc_balance < DEFAULT_INVESTMENT_AMOUNT:
+                logger.warning(f"Saldo insuficiente para más operaciones. Saldo actual: {usdc_balance:.2f} USDC, Mínimo requerido: {DEFAULT_INVESTMENT_AMOUNT} USDC")
+                break
+                
             if coin['symbol'] in self.excluded_symbols:
                 logger.warning(f"Se excluye {coin['symbol']} de análisis técnico.")
                 continue
@@ -265,11 +277,14 @@ class BuyManager(BuyUseCase):
                 logger.warning(f"No histórico para {symbol}. Se excluirá en siguientes iteraciones.\n")
                 self.failed_symbols.add(symbol)
                 continue
+                
             if not analysis.get('trend'):
                 continue
+                
             # Filtrar el activo
             if symbol not in self.asset_filter.filter([symbol]):
                 continue
+                
             # Verificar si ya existe el activo en la base de datos
             with Session(self.engine) as session:
                 existing_asset = session.query(Asset).filter(Asset.symbol == symbol.replace('USDC', '')).first()
@@ -277,29 +292,40 @@ class BuyManager(BuyUseCase):
                     logger.info(f"El activo {symbol} ya existe en la base de datos. Omitiendo compra.")
                     continue
 
-            # Obtener precio y saldo actual antes de cada decisión
+            # Obtener precio actual
             current_price = self.data_provider.get_price(symbol)
-            usdc_balance = float(
-                next((b['free'] for b in self.data_provider.get_balance_summary() if b['asset'] == 'USDC'), 0.0)
-            )
             
+            # Calcular cantidad a comprar
             quantity = self.quantity_calculator.calculate(symbol)
             if quantity <= 0:
                 logger.info(f"Cantidad a comprar 0 para {symbol}")
                 continue
                 
+            # Calcular costo total de la operación
+            total_cost = current_price * quantity
+            
+            # Verificar si hay saldo suficiente para esta operación
+            if total_cost > usdc_balance:
+                logger.warning(f"Saldo insuficiente para {symbol}. Necesario: {total_cost:.2f} USDC, Disponible: {usdc_balance:.2f} USDC")
+                continue
+                
             indicators = analysis.get('indicators', {})
             is_bubble = analysis.get('bubble_override', False)
-            should = usdc_balance >= DEFAULT_INVESTMENT_AMOUNT  # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
+            should = True  # self.decision_engine.should_buy(symbol, current_price, quantity, indicators)
             
-            # Permitir compra si override de burbuja o precio override
+            # Permitir compra si override de burbuja o precio override o si debería comprar
             if is_bubble or analysis.get('sell_price_override') or should:
                 # Verificar límites de exposición
                 if not self.risk_manager.can_open_position(current_price, quantity):
                     logger.warning(f"{symbol}: no abre posición, límite de exposición alcanzado")
                     continue
+                    
                 # Ejecutar compra
                 if self._make_action(symbol, current_price, quantity, is_bubble):
+                    # Actualizar saldo disponible
+                    usdc_balance -= total_cost
+                    logger.info(f"Compra ejecutada. Nuevo saldo disponible: {usdc_balance:.2f} USDC")
+                    
                     # Programar stop-loss/take-profit automáticos
                     stop_pct = settings.STOP_LOSS_MARGIN / 100
                     take_pct = settings.PROFIT_MARGIN / 100
@@ -309,8 +335,9 @@ class BuyManager(BuyUseCase):
                     if is_bubble:
                         bubble_register(symbol)
                         logger.info(f"Compra de burbuja registrada para {symbol}")
-                # Esperar un poco para no saturar la API ni la cuenta
-                time.sleep(5)
+                    
+                    # Pequeña pausa entre operaciones
+                    time.sleep(5)
 
     def _make_action(self, symbol: str, current_price: float, quantity_to_buy: float, is_bubble: bool = False) -> bool:
         """

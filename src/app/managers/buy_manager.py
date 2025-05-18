@@ -1,6 +1,7 @@
 import time
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Tuple, Optional, Set
+from sqlalchemy.exc import SQLAlchemyError
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from prettytable import PrettyTable
@@ -56,6 +57,7 @@ class BuyManager(BuyUseCase):
 
         # Configurar la conexión a la base de datos
         self.engine = create_engine(SQLALCHEMY_DATABASE_URL)
+        self.excluded_symbols: Set[str] = ['EURUSDC', 'USDCUSDC']
 
     def calculate_interval_in_milliseconds(self, interval: str) -> int:
         """
@@ -254,6 +256,10 @@ class BuyManager(BuyUseCase):
         # Procesar cada moneda y actuar inmediatamente si hay señal
         logger.info(f"Procesando {len(coins_to_process)} monedas secuencialmente para análisis técnico.\n")
         for coin in coins_to_process:
+            if coin['symbol'] in self.excluded_symbols:
+                logger.warning(f"Se excluye {coin['symbol']} de análisis técnico.")
+                continue
+
             symbol, analysis = self._process_coin(coin, start_time, end_time)
             if not analysis:
                 logger.warning(f"No histórico para {symbol}. Se excluirá en siguientes iteraciones.\n")
@@ -319,42 +325,67 @@ class BuyManager(BuyUseCase):
         Returns:
             bool: True si la operación fue exitosa, False en caso contrario
         """
-        # Ejecutar la orden de compra
-        trade_result = self.executor.execute_trade(
-            side="BUY",
-            symbol=symbol,
-            order_type="MARKET",
-            positions=quantity_to_buy,
-            price=current_price,
-            reason="BUBBLE_BUY" if is_bubble else "REGULAR_BUY",
-        )
-
-        if not trade_result:
-            logger.error(f"Error al procesar la compra para {symbol}")
-            return False
-            
-        logger.info(f"Orden de compra ejecutada para {symbol}.")
+        logger.info(f"Iniciando compra de {quantity_to_buy} {symbol} a precio {current_price} USDC")
         
+        # Asegurarse de que las cantidades tengan el tipo y precisión correctos
         try:
+            current_price = float(current_price)
+            quantity_to_buy = float(quantity_to_buy)
+            total_cost = current_price * quantity_to_buy
+            
+            logger.debug(f"Datos validados - Precio: {current_price}, Cantidad: {quantity_to_buy}, Total: {total_cost}")
+            
+            # Ejecutar la orden de compra
+            trade_result = self.executor.execute_trade(
+                side="BUY",
+                symbol=symbol,
+                order_type="MARKET",
+                positions=quantity_to_buy,
+                price=current_price,
+                reason="BUBBLE_BUY" if is_bubble else "REGULAR_BUY",
+            )
+
+            if not trade_result:
+                logger.error(f"Error al procesar la orden de compra para {symbol}")
+                return False
+                
+            logger.info(f"Orden de compra ejecutada exitosamente para {quantity_to_buy} {symbol} a {current_price} USDC")
+            
+            # Preparar el símbolo para guardar (solo si termina en USDC)
+            base_symbol = symbol
+            if symbol.endswith('USDC'):
+                base_symbol = symbol[:-4]  # Eliminar 'USDC' del final
+            
             # Guardar el activo en la base de datos
             with Session(self.engine) as session:
-                asset = Asset(
-                    symbol=symbol.replace('USDC', ''),  # Guardar solo el símbolo sin USDC
-                    purchase_price=float(current_price),
-                    amount=float(quantity_to_buy),
-                    total_purchase_price=float(current_price) * float(quantity_to_buy),
-                    is_bubble=is_bubble,
-                    force_sell=is_bubble  # Si es burbuja, forzar venta en el futuro
-                )
-                session.add(asset)
-                session.commit()
-                logger.info(f"Activo {symbol} registrado en la base de datos")
-                return True
-                
+                try:
+                    asset = Asset(
+                        symbol=base_symbol,
+                        purchase_price=current_price,
+                        amount=quantity_to_buy,
+                        total_purchase_price=total_cost,
+                        is_bubble=is_bubble,
+                        force_sell=is_bubble  # Si es burbuja, forzar venta en el futuro
+                    )
+                    session.add(asset)
+                    session.commit()
+                    logger.info(f"Activo {base_symbol} registrado en la base de datos")
+                    logger.debug(f"Detalles del activo: {asset}")
+                    return True
+                    
+                except SQLAlchemyError as e:
+                    session.rollback()
+                    logger.error(f"Error de base de datos al guardar {symbol}: {str(e)}")
+                    logger.exception("Detalles del error:")
+                    return False
+                    
+                except Exception as e:
+                    session.rollback()
+                    logger.error(f"Error inesperado al guardar {symbol}: {str(e)}")
+                    logger.exception("Detalles del error:")
+                    return False
+                    
         except Exception as e:
-            logger.error(f"Error al guardar el activo {symbol} en la base de datos: {e}")
-            try:
-                session.rollback()
-            except:
-                pass
+            logger.error(f"Error en el proceso de compra para {symbol}: {str(e)}")
+            logger.exception("Detalles del error:")
             return False

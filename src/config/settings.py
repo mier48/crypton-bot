@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     USE_OPEN_AI_API: bool = Field(False, env="USE_OPEN_AI_API")
     LOG_LEVEL: str = Field("INFO", env="LOG_LEVEL")
     METRICS_PORT: int = Field(8000, env="METRICS_PORT")
+    
+    # Configuración del sistema de optimización de portafolio
+    EXECUTION_MODE: str = Field("full", env="EXECUTION_MODE")  # Opciones: 'trade', 'portfolio', 'full'
+    RISK_AVERSION: float = Field(0.6, env="RISK_AVERSION")  # 0 (solo retorno) a 1 (solo riesgo)
+    MAX_ALLOCATION_PER_ASSET: float = Field(0.25, env="MAX_ALLOCATION_PER_ASSET")  # Máximo 25% en un solo activo
+    REBALANCE_THRESHOLD: float = Field(0.15, env="REBALANCE_THRESHOLD")  # Rebalancear cuando desviación > 15%
+    SCHEDULED_REBALANCE_HOURS: int = Field(24, env="SCHEDULED_REBALANCE_HOURS")  # Rebalanceo diario
+    PORTFOLIO_CHECK_INTERVAL: int = Field(3600, env="PORTFOLIO_CHECK_INTERVAL")  # Verificar cada hora
     # Interval settings
     DEFAULT_CHECK_PRICE_INTERVAL: str = Field(DEFAULT_CHECK_PRICE_INTERVAL, env="DEFAULT_CHECK_PRICE_INTERVAL")
     DEFAULT_HISTORICAL_RANGE_HOURS: int = Field(DEFAULT_HISTORICAL_RANGE_HOURS, env="DEFAULT_HISTORICAL_RANGE_HOURS")

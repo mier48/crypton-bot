@@ -1,4 +1,6 @@
 import requests
+import re
+import unicodedata
 from typing import Optional
 from datetime import datetime
 from config.telegram import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
@@ -13,6 +15,48 @@ class TelegramNotifier:
         self.chat_id = TELEGRAM_CHAT_ID
         self.api_url_send = f"https://api.telegram.org/bot{self.bot_token}/sendMessage"
 
+    def sanitize_message(self, message: str) -> str:
+        """
+        Sanitiza el mensaje para evitar problemas de codificación con caracteres Unicode.
+        
+        Args:
+            message: El mensaje original que podría contener emojis o caracteres especiales
+            
+        Returns:
+            str: El mensaje sanitizado
+        """
+        try:
+            # Reemplazar emojis problemáticos por alternativas seguras
+            emoji_replacements = {
+                '\ud83d\udcc8': '📈',  # Gráfico ascendente
+                '\ud83d\udcc9': '📉',  # Gráfico descendente
+                '\u2194\ufe0f': '↔️',   # Flecha horizontal
+                '\u26a1': '⚡',         # Relámpago
+                '\u2b50': '⭐',         # Estrella
+                '\u2606': '☆',         # Estrella vacía
+                '\ud83d\udcb0': '💰',   # Bolsa de dinero
+                '\ud83d\udcc8': '📈',   # Gráfico
+                '\u2139\ufe0f': 'ℹ️',   # Información
+                '\u26a0\ufe0f': '⚠️'    # Advertencia
+            }
+            
+            # Intentar usar una estrategia más segura de codificación
+            # 1. Normalizar Unicode
+            message = unicodedata.normalize('NFC', message)
+            
+            # 2. Eliminar caracteres no imprimibles
+            message = ''.join(c for c in message if unicodedata.category(c)[0] != 'C')
+            
+            # 3. Reemplazar emojis problemáticos (si es necesario)
+            for bad_emoji, good_emoji in emoji_replacements.items():
+                message = message.replace(bad_emoji, good_emoji)
+            
+            return message
+        except Exception as e:
+            logger.warning(f"Error sanitizando mensaje: {e}, retornando mensaje simplificado")
+            # En caso de error, retornar sólo texto ASCII
+            return re.sub(r'[^\x00-\x7F]+', '?', message)
+            
     def send_message(self, message: str, parse_mode: str = "Markdown") -> bool:
         """
         Sends a text message via Telegram.
@@ -21,9 +65,11 @@ class TelegramNotifier:
         :param parse_mode: Message format (e.g., "Markdown").
         :return: True if successfully sent, False otherwise.
         """
-        data = {"chat_id": self.chat_id, "text": message, "parse_mode": parse_mode}
-
         try:
+            # Sanitizar el mensaje para evitar problemas de codificación
+            sanitized_message = self.sanitize_message(message)
+            data = {"chat_id": self.chat_id, "text": sanitized_message, "parse_mode": parse_mode}
+
             response = requests.post(self.api_url_send, data=data)
             if response.status_code == 200:
                 logger.info(f"[Telegram] Message sent: {message[:50]}...")

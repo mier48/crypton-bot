@@ -160,7 +160,7 @@ class BaseClient:
                 self._wait_for_rate_limit()
                 self._check_rate_limits()
                 
-                logger.debug(f"Making {method} request to {url}")
+                # logger.debug(f"Making {method} request to {url}")
                 response = self.session.request(method, url, timeout=self.timeout, **kwargs)
                 response.raise_for_status()
                 

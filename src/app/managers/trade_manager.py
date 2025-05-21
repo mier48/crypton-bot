@@ -131,6 +131,66 @@ class TradeManager:
         except Exception as e:
             logger.error(f"Error al verificar fondos disponibles: {e}")
             return False
+            
+    def is_market_trend_favorable(self) -> bool:
+        """
+        Analiza las tendencias de múltiples criptomonedas en las últimas horas.
+        Si más del 75% de las criptomonedas tienen tendencia bajista, se considera
+        que el mercado no es favorable para comprar.
+        
+        Returns:
+            bool: True si la tendencia de mercado es favorable, False si es bajista.
+        """
+        try:
+            # Lista de símbolos populares para analizar (se pueden ajustar según preferencias)
+            symbols = ['BTCUSDC', 'ETHUSDC', 'BNBUSDC', 'XRPUSDC', 'ADAUSDC', 'SOLUSDC', 'DOTUSDC', 'AVAXUSDC']
+            timeframe = '1h'
+            period = 3  # Analizar las últimas 3 horas
+            
+            # Contador de tendencias bajistas
+            bearish_count = 0
+            total_analyzed = 0
+            
+            for symbol in symbols:
+                try:
+                    # Obtener datos de precio de las últimas horas
+                    klines = self.data_manager.get_recent_klines(symbol, timeframe, period)
+                    
+                    if len(klines) >= period:
+                        # Analizar si la tendencia es bajista comparando el precio de cierre
+                        # del primer y último período
+                        first_close = float(klines[0][4])  # Close price del primer período
+                        last_close = float(klines[-1][4])  # Close price del último período
+                        
+                        if last_close < first_close:
+                            bearish_count += 1
+                            logger.debug(f"{symbol} muestra tendencia bajista en las últimas {period} horas")
+                        else:
+                            logger.debug(f"{symbol} muestra tendencia alcista o neutral en las últimas {period} horas")
+                        
+                        total_analyzed += 1
+                except Exception as e:
+                    logger.error(f"Error al analizar tendencia de {symbol}: {e}")
+            
+            # Si no se pudieron analizar suficientes símbolos, asumir que es seguro comprar
+            if total_analyzed < 4:
+                logger.warning(f"No se pudieron analizar suficientes símbolos ({total_analyzed}). Asumiendo mercado favorable.")
+                return True
+            
+            # Calcular porcentaje de tendencias bajistas
+            bearish_percentage = (bearish_count / total_analyzed) * 100
+            is_favorable = bearish_percentage <= 75
+            
+            logger.info(f"Análisis de tendencia del mercado: {bearish_percentage:.1f}% de {total_analyzed} criptos analizadas muestran tendencia bajista.")
+            if not is_favorable:
+                logger.warning(f"Mercado desfavorable para compras: {bearish_percentage:.1f}% de símbolos en tendencia bajista supera el umbral del 75%.")
+            
+            return is_favorable
+            
+        except Exception as e:
+            logger.error(f"Error al verificar tendencia del mercado: {e}")
+            # En caso de error, permitir compras (mejor ser conservador)
+            return True
 
     def run(self) -> None:
         """
@@ -147,8 +207,8 @@ class TradeManager:
                 except Exception as e:
                     logger.error(f"Error en análisis de venta: {e}")
                 
-                # Verificar fondos antes de intentar comprar
-                if self.has_available_funds():
+                # Verificar fondos y tendencia del mercado antes de intentar comprar
+                if self.has_available_funds() and self.is_market_trend_favorable():
                     try:
                         self.buy_manager.analyze_and_execute_buys()
                     except Exception as e:

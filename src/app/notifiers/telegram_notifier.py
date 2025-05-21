@@ -42,10 +42,10 @@ class TelegramNotifier:
             
             # Intentar usar una estrategia más segura de codificación
             # 1. Normalizar Unicode
-            message = unicodedata.normalize('NFC', message)
+            # message = unicodedata.normalize('NFC', message)
             
             # 2. Eliminar caracteres no imprimibles
-            message = ''.join(c for c in message if unicodedata.category(c)[0] != 'C')
+            # message = ''.join(c for c in message if unicodedata.category(c)[0] != 'C')
             
             # 3. Reemplazar emojis problemáticos (si es necesario)
             for bad_emoji, good_emoji in emoji_replacements.items():

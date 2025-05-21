@@ -1,7 +1,7 @@
 from pydantic import BaseSettings, Field
 from config.default import DEFAULT_CHECK_PRICE_INTERVAL, DEFAULT_HISTORICAL_RANGE_HOURS, DEFAULT_EXT_HISTORICAL_MULTIPLIER, DEFAULT_MAX_EXPOSURE_PERCENT, DEFAULT_RISK_PER_TRADE_PERCENT
 from datetime import datetime, timezone
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 class Settings(BaseSettings):
     MAX_RECORDS: int = Field(500, env="MAX_RECORDS")
@@ -38,6 +38,26 @@ class Settings(BaseSettings):
     MAX_EXPOSURE_PERCENT: float = Field(DEFAULT_MAX_EXPOSURE_PERCENT, env="MAX_EXPOSURE_PERCENT")
     RISK_PER_TRADE_PERCENT: float = Field(DEFAULT_RISK_PER_TRADE_PERCENT, env="RISK_PER_TRADE_PERCENT")
     ANOMALY_CONTAMINATION: float = Field(0.01, env="ANOMALY_CONTAMINATION")
+    
+    # Configuración del sistema de adaptación a ciclos de mercado
+    ENABLE_MARKET_CYCLE_ADAPTATION: bool = Field(True, env="ENABLE_MARKET_CYCLE_ADAPTATION")
+    MARKET_CYCLE_UPDATE_INTERVAL: int = Field(8, env="MARKET_CYCLE_UPDATE_INTERVAL")  # Horas
+    MARKET_CYCLE_LOOKBACK_DAYS: int = Field(90, env="MARKET_CYCLE_LOOKBACK_DAYS")
+    
+    # Configuraciones para diferentes ciclos de mercado (usado como valores base)
+    ACCUMULATION_RISK_AVERSION: float = Field(0.5, env="ACCUMULATION_RISK_AVERSION")
+    UPTREND_RISK_AVERSION: float = Field(0.3, env="UPTREND_RISK_AVERSION")
+    DISTRIBUTION_RISK_AVERSION: float = Field(0.7, env="DISTRIBUTION_RISK_AVERSION")
+    DOWNTREND_RISK_AVERSION: float = Field(0.9, env="DOWNTREND_RISK_AVERSION")
+    
+    # Configuración DCA (Dollar Cost Averaging)
+    ENABLE_DCA: bool = Field(True, env="ENABLE_DCA")
+    DCA_MAX_BUYS: int = Field(3, env="DCA_MAX_BUYS")  # Máximo número de compras DCA
+    DCA_PRICE_DECREASE: float = Field(0.15, env="DCA_PRICE_DECREASE")  # % de caída para activar DCA
+    
+    # Configuración de notificaciones de ciclos de mercado
+    NOTIFY_MARKET_CYCLE_CHANGES: bool = Field(True, env="NOTIFY_MARKET_CYCLE_CHANGES")  # Enviar notificación al cambiar de ciclo
+    NOTIFY_ADAPTATION_DETAILS: bool = Field(False, env="NOTIFY_ADAPTATION_DETAILS")  # Enviar detalles de adaptaciones
 
     class Config:
         env_file = ".env"

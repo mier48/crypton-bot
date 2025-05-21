@@ -2,6 +2,7 @@ import os
 import sys
 import signal
 import threading
+import time
 
 # Add the project root to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -14,6 +15,7 @@ from loguru import logger
 from src.app.managers.trade_manager import TradeManager
 from src.app.portfolio.manager import PortfolioManager
 from src.app.notifications.portfolio_notifier import start_portfolio_notifier
+from src.app.market_cycles.strategy_manager import AdaptiveStrategyManager
 
 def initialize_database() -> None:
     """Inicializa la base de datos y carga el portafolio inicial si es necesario"""
@@ -89,6 +91,35 @@ def main():
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
     
+    # Inicializar el sistema de adaptación a ciclos de mercado si está habilitado
+    market_cycle_manager = None
+    if settings.ENABLE_MARKET_CYCLE_ADAPTATION:
+        try:
+            # Usar el mismo data_manager para mantener la coherencia
+            market_data_manager = data_manager
+            market_cycle_manager = AdaptiveStrategyManager(market_data_manager)
+            
+            # Forzar una primera actualización del ciclo de mercado al inicio
+            cycle_info = market_cycle_manager.update_market_state(force=True)
+            current_cycle = cycle_info.get('market_cycle', {}).get('current', 'unknown')
+            logger.info(f"Sistema de adaptación a ciclos de mercado inicializado (ciclo actual: {current_cycle})")
+            
+            # Compartir el market_cycle_manager con el risk_manager para las adaptaciones
+            if trade_manager and hasattr(trade_manager, 'risk_manager'):
+                trade_manager.risk_manager.strategy_manager = market_cycle_manager
+                logger.info("Integrado sistema de adaptación con el gestor de riesgos")
+                
+            # Compartir con el portfolio_manager si es necesario
+            if portfolio_manager:
+                # Conectar el portfolio_manager con el sistema de adaptación
+                if hasattr(portfolio_manager, 'set_strategy_manager'):
+                    portfolio_manager.set_strategy_manager(market_cycle_manager)
+                    logger.info("Integrado sistema de adaptación con el gestor de portafolio")
+        except Exception as e:
+            logger.error(f"Error al inicializar el sistema de adaptación a ciclos de mercado: {e}")
+    else:
+        logger.info("Sistema de adaptación a ciclos de mercado desactivado en la configuración")
+        
     # Iniciar servicios y managers en hilos separados
     threads = []
     
@@ -101,6 +132,33 @@ def main():
         )
         notification_thread.start()
         threads.append(notification_thread)
+        
+    # Hilo para actualizar periódicamente el ciclo de mercado
+    if market_cycle_manager:
+        update_interval = settings.MARKET_CYCLE_UPDATE_INTERVAL * 3600  # Convertir horas a segundos
+        
+        def update_market_cycle_periodically():
+            while True:
+                try:
+                    # Dormir durante el intervalo configurado
+                    time.sleep(update_interval)
+                    
+                    # Actualizar el ciclo de mercado
+                    adaptations = market_cycle_manager.update_market_state()
+                    current_cycle = adaptations.get('market_cycle', {}).get('current', 'unknown')
+                    logger.info(f"Ciclo de mercado actualizado automáticamente: {current_cycle}")
+                except Exception as e:
+                    logger.error(f"Error al actualizar ciclo de mercado: {e}")
+                    time.sleep(300)  # Esperar 5 minutos antes de reintentar en caso de error
+        
+        # Iniciar el hilo de actualización del ciclo de mercado
+        market_cycle_thread = threading.Thread(
+            target=update_market_cycle_periodically,
+            daemon=True
+        )
+        market_cycle_thread.start()
+        threads.append(market_cycle_thread)
+        logger.info(f"Actualización automática de ciclos de mercado programada cada {settings.MARKET_CYCLE_UPDATE_INTERVAL} horas")
     
     # Hilo para el portfolio manager
     if portfolio_manager:

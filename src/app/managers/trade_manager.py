@@ -1,3 +1,4 @@
+import os
 import time
 from api.binance.data_manager import BinanceDataManager
 from api.openai.client import OpenAIClient
@@ -16,6 +17,8 @@ from app.services.price_calculator import PriceCalculator
 from app.services.sell_decision_engine import SellDecisionEngine
 from app.services.investment_calculator import InvestmentCalculator
 from app.strategies.loader import load_strategies  # Import plugin loader
+from config.database import init_db
+from utils.portfolio_initializer import PortfolioInitializer
 from loguru import logger
 
 from config.default import (
@@ -222,6 +225,9 @@ class TradeManager:
                 except Exception as e:
                     logger.error(f"Error en análisis de venta: {e}")
                 
+                # Reiniciar la base de datos antes de iniciar el siguiente ciclo
+                self.reset_database()
+                
                 logger.warning(f"Bucle de compra y venta finalizado, esperando {self.sleep_interval} segundos.")
                 time.sleep(self.sleep_interval)
                 
@@ -257,3 +263,30 @@ class TradeManager:
             except Exception as e:
                 logger.error(f"Error en sell loop: {e}")
             time.sleep(self.sleep_interval)
+            
+    def reset_database(self) -> None:
+        """
+        Reinicia la base de datos: borra todos los datos y vuelve a inicializarla.
+        """
+        try:
+            logger.info("Reiniciando la base de datos...")
+            
+            # Obtener la ruta del archivo de base de datos
+            db_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), 'crypton_bot.db')
+            
+            # Borrar el archivo si existe
+            if os.path.exists(db_file):
+                os.remove(db_file)
+                logger.info("Base de datos existente eliminada.")
+            
+            # Inicializar la base de datos (crear tablas)
+            init_db()
+            logger.info("Base de datos inicializada correctamente.")
+            
+            # Cargar el portafolio inicial
+            initializer = PortfolioInitializer()
+            initializer.initialize_portfolio()
+            logger.info("Portafolio inicial cargado correctamente.")
+            
+        except Exception as e:
+            logger.error(f"Error al reiniciar la base de datos: {e}")

@@ -245,7 +245,7 @@ class BinanceAccountClient(BaseClient):
             if isinstance(response, dict) and response.get('error'):
                 # Manejar el error devuelto por el método post
                 error_msg = (
-                    f"❌ Error {response.get('status_code', '')} - {response.get('message', 'Error desconocido')} "
+                    f"❌ Error {response.get('status_code', '')} "
                     f"(Code: {response.get('code', 'N/A')}) - {side} {symbol}"
                 )
                 logger.error(error_msg)

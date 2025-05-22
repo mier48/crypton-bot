@@ -280,7 +280,8 @@ class TradeManager:
                 logger.info("Base de datos existente eliminada.")
             
             # Inicializar la base de datos (crear tablas)
-            init_db()
+            from src.config.database import Base, engine
+            Base.metadata.create_all(bind=engine)
             logger.info("Base de datos inicializada correctamente.")
             
             # Cargar el portafolio inicial

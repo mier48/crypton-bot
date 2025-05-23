@@ -187,15 +187,35 @@ class Rebalancer:
                     # Log de diagnóstico
                     logger.debug(f"Evaluando compra de {symbol}: valor actual={current_value:.2f}, valor objetivo={target_value:.2f}, diferencia={value_to_buy:.2f} USDC, USDC disponible={usdc_available:.2f}")
                     
-                    # No comprar menos del valor mínimo establecido ($5)
+                    # Verificar si el activo ya existe en la base de datos (no comprar duplicados)
+                    try:
+                        if not self.db_session:
+                            self.db_session = SessionLocal()
+                            
+                        db_manager = DatabaseManager(self.db_session)
+                        existing_asset = db_manager.get_asset_by_symbol(symbol)
+                        
+                        if existing_asset:
+                            logger.info(f"No se comprará {symbol}: ya existe en el portafolio con {existing_asset.amount} unidades")
+                            continue
+                    except Exception as e:
+                        logger.error(f"Error verificando si {symbol} ya existe en la base de datos: {e}")
+                    
+                    # No comprar menos del valor mínimo establecido
                     if value_to_buy < self.min_buy_value:
                         logger.info(f"No se comprará {symbol}: el valor a comprar (${value_to_buy:.2f}) es menor al mínimo de ${self.min_buy_value:.2f}")
                         continue
                     
                     # Solo considerar compras significativas y si hay USDC disponible
-                    if value_to_buy >= self.min_order_value and usdc_available > 0:
-                        # Limitar al USDC disponible
+                    # Asegurar que no sea menor que el mínimo buy_value, incluso después de ajustes
+                    if value_to_buy >= max(self.min_order_value, self.min_buy_value) and usdc_available > 0:
+                        # Limitar al USDC disponible y asegurar valor mínimo de compra
                         value_to_buy = min(value_to_buy, usdc_available)
+                        
+                        # Verificar si después del ajuste aún cumple con el mínimo
+                        if value_to_buy < self.min_buy_value:
+                            logger.info(f"No se comprará {symbol}: después de ajustes, el valor (${value_to_buy:.2f}) es menor al mínimo de ${self.min_buy_value:.2f}")
+                            continue
                         
                         # Obtener precio actual
                         price = None

@@ -5,6 +5,7 @@ from sqlalchemy import create_engine
 from typing import Any, Optional
 from src.models.asset import Asset
 from src.config.database import SQLALCHEMY_DATABASE_URL
+from config.settings import settings
 
 def send_portfolio_update(data_manager: Any, notifier: Any) -> None:
     """
@@ -106,6 +107,10 @@ def send_portfolio_update(data_manager: Any, notifier: Any) -> None:
                     f"• {'Ganancia' if total_profit_loss >= 0 else 'Pérdida'}: "
                     f"{total_profit_loss_pct:+.2f}% (${abs(total_profit_loss):.2f})"
                 )
+
+                lines.append(f"\n")
+                lines.append(f"\nExecute buys: {settings.EXECUTE_BUYS}")
+                lines.append(f"\nExecution mode: {settings.EXECUTION_MODE}")
             
             # Enviar mensaje
             message = "\n".join(lines)

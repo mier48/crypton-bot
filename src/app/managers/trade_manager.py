@@ -211,7 +211,7 @@ class TradeManager:
                     logger.error(f"Error en análisis de venta: {e}")
                 
                 # Verificar fondos y tendencia del mercado antes de intentar comprar
-                if self.has_available_funds() and self.is_market_trend_favorable():
+                if self.has_available_funds() and self.is_market_trend_favorable() and settings.EXECUTE_BUYS:
                     try:
                         self.buy_manager.analyze_and_execute_buys()
                     except Exception as e:

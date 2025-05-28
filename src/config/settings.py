@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     METRICS_PORT: int = Field(8000, env="METRICS_PORT")
     
     # Configuración del sistema de optimización de portafolio
-    EXECUTION_MODE: str = Field("full", env="EXECUTION_MODE")  # Opciones: 'trade', 'portfolio', 'full'
+    EXECUTION_MODE: str = Field("trade", env="EXECUTION_MODE")  # Opciones: 'trade', 'portfolio', 'full'
     RISK_AVERSION: float = Field(0.6, env="RISK_AVERSION")  # 0 (solo retorno) a 1 (solo riesgo)
     MAX_ALLOCATION_PER_ASSET: float = Field(0.25, env="MAX_ALLOCATION_PER_ASSET")  # Máximo 25% en un solo activo
     REBALANCE_THRESHOLD: float = Field(0.15, env="REBALANCE_THRESHOLD")  # Rebalancear cuando desviación > 15%
@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     # Configuración de notificaciones de ciclos de mercado
     NOTIFY_MARKET_CYCLE_CHANGES: bool = Field(True, env="NOTIFY_MARKET_CYCLE_CHANGES")  # Enviar notificación al cambiar de ciclo
     NOTIFY_ADAPTATION_DETAILS: bool = Field(False, env="NOTIFY_ADAPTATION_DETAILS")  # Enviar detalles de adaptaciones
+
+    EXECUTE_BUYS: bool = Field(False, env="EXECUTE_BUYS")
 
     class Config:
         env_file = ".env"
